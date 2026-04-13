@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "aisc:convert": "tsx scripts/excel-to-aisc-json.ts",
-    "dev": "next dev",
-    "build": "next build",
+    "excel:formulas": "tsx scripts/extract-workbook-formulas.ts",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -28,6 +30,7 @@
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

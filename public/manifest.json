@@ -2,20 +2,34 @@
   "name": "AISC Structural Engineering PWA",
   "short_name": "AISC PWA",
   "description": "AISC 16th Edition structural design and analysis toolkit.",
+  "id": "/",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/",
+  "orientation": "portrait-primary",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#f8fafc",
   "theme_color": "#1d4ed8",
+  "categories": ["education", "productivity", "utilities"],
   "icons": [
     {
-      "src": "/next.svg",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/vercel.svg",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }

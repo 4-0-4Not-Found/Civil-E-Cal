@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,26 @@ export const metadata: Metadata = {
   title: "AISC Structural Engineering PWA",
   description: "Progressive Web App for AISC-based structural engineering calculations.",
   manifest: "/manifest.json",
+  applicationName: "AISC Structural Engineering PWA",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AISC PWA",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1d4ed8",
 };
 
 export default function RootLayout({
