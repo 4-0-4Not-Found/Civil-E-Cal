@@ -1,17 +1,17 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
-export function Button(
-  props: ButtonHTMLAttributes<HTMLButtonElement> & {
-    variant?: Variant;
-    size?: Size;
-    leftIcon?: ReactNode;
-    rightIcon?: ReactNode;
-  },
-) {
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(props, ref) {
   const variant = props.variant ?? "secondary";
   const size = props.size ?? "md";
 
@@ -32,11 +32,10 @@ export function Button(
 
   const { className, leftIcon, rightIcon, children, ...rest } = props;
   return (
-    <button className={cn(base, sizes, variants, className)} {...rest}>
+    <button ref={ref} className={cn(base, sizes, variants, className)} {...rest}>
       {leftIcon ? <span className="shrink-0">{leftIcon}</span> : null}
       <span className="min-w-0 truncate">{children}</span>
       {rightIcon ? <span className="shrink-0">{rightIcon}</span> : null}
     </button>
   );
-}
-
+});

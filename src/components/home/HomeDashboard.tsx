@@ -113,6 +113,15 @@ function writeHomeOrder(order: string[]) {
   }
 }
 
+function emptyModuleState(): Record<ModuleKey, { hasData: boolean; savedTs: number | null }> {
+  return {
+    tension: { hasData: false, savedTs: null },
+    compression: { hasData: false, savedTs: null },
+    bending: { hasData: false, savedTs: null },
+    connections: { hasData: false, savedTs: null },
+  };
+}
+
 function previewLineFor(key: ModuleKey): string | null {
   try {
     const raw = localStorage.getItem(STORAGE[key]);
@@ -150,9 +159,13 @@ function previewLineFor(key: ModuleKey): string | null {
 
 export function HomeDashboard() {
   const [tick, setTick] = useState(0);
+  /** false until after mount — SSR and first client paint must not read localStorage (differs from server HTML). */
+  const [mounted, setMounted] = useState(false);
+  /** null until mounted — avoids SSR vs client mismatch on navigator.onLine */
+  const [networkOnline, setNetworkOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
-    queueMicrotask(() => setTick((v) => v + 1));
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -161,35 +174,49 @@ export function HomeDashboard() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  const isOffline = useMemo(() => (typeof navigator !== "undefined" ? !navigator.onLine : false), [tick]);
+  useEffect(() => {
+    const sync = () => setNetworkOnline(navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
 
   const resumeHref = useMemo(() => {
+    if (!mounted) return null;
     try {
-      if (typeof window === "undefined") return null;
       const last = localStorage.getItem("ssc:lastRoute");
       if (!last || last === "/") return null;
       return last;
     } catch {
       return null;
     }
-  }, [tick]);
+  }, [tick, mounted]);
 
   const moduleState = useMemo(() => {
+    if (!mounted) return emptyModuleState();
     const out: Record<string, { hasData: boolean; savedTs: number | null }> = {};
     for (const m of modules) {
       const k = STORAGE[m.key];
-      const hasData = typeof window !== "undefined" && Boolean(localStorage.getItem(k));
-      const rawTs = typeof window !== "undefined" ? localStorage.getItem(tsKey(m.key)) : null;
+      const hasData = Boolean(localStorage.getItem(k));
+      const rawTs = localStorage.getItem(tsKey(m.key));
       const ts = rawTs ? Number(rawTs) : null;
       out[m.key] = { hasData, savedTs: Number.isFinite(ts ?? NaN) ? ts : null };
     }
     return out;
-  }, [tick]);
+  }, [tick, mounted]);
 
-  const favorites = useMemo(() => (typeof window !== "undefined" ? readFavorites() : []), [tick]);
+  const favorites = useMemo(() => {
+    if (!mounted) return [];
+    return readFavorites();
+  }, [tick, mounted]);
 
   const orderedModules = useMemo(() => {
-    const order = typeof window !== "undefined" ? readHomeOrder() : null;
+    if (!mounted) return modules;
+    const order = readHomeOrder();
     if (!order) return modules;
     const byHref = new Map(modules.map((m) => [m.href, m] as const));
     const kept: typeof modules = [];
@@ -200,23 +227,27 @@ export function HomeDashboard() {
     // Append any new modules not in storage order.
     for (const m of modules) if (!kept.some((x) => x.href === m.href)) kept.push(m);
     return kept;
-  }, [tick]);
+  }, [tick, mounted]);
 
   const modulesWithPreview = useMemo(() => {
+    if (!mounted) {
+      return modules.map((m) => ({ ...m, preview: null as string | null, isFav: false }));
+    }
     return orderedModules.map((m) => ({
       ...m,
-      preview: typeof window !== "undefined" ? previewLineFor(m.key) : null,
+      preview: previewLineFor(m.key),
       isFav: favorites.includes(m.href),
     }));
-  }, [orderedModules, favorites]);
+  }, [orderedModules, favorites, mounted]);
 
   const recent = useMemo(() => {
+    if (!mounted) return [];
     return modulesWithPreview
       .map((m) => ({ m, s: moduleState[m.key] }))
       .filter((x) => x.s?.hasData)
       .sort((a, b) => (b.s?.savedTs ?? 0) - (a.s?.savedTs ?? 0))
       .slice(0, 4);
-  }, [moduleState, modulesWithPreview]);
+  }, [moduleState, modulesWithPreview, mounted]);
 
   return (
     <div className="space-y-6">
@@ -225,7 +256,13 @@ export function HomeDashboard() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="info">AISC 16th Edition</Badge>
             <Badge>Offline-first PWA</Badge>
-            {isOffline ? <Badge tone="bad">Offline</Badge> : <Badge tone="good">Online</Badge>}
+            {networkOnline === null ? (
+              <Badge tone="neutral">…</Badge>
+            ) : networkOnline ? (
+              <Badge tone="good">Online</Badge>
+            ) : (
+              <Badge tone="bad">Offline</Badge>
+            )}
           </div>
 
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
