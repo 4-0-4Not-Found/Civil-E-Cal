@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CommandPaletteButton, CommandPaletteHost } from "@/components/command/CommandPalette";
@@ -207,7 +206,7 @@ export function AppHeader() {
       {/* Top row: branding + key status controls */}
       <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-2.5 md:px-8">
         <div className="min-w-0">
-          <Link
+          <a
             href="/"
             className="group flex min-w-0 items-center gap-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
             aria-label="Structural Steel Calculators — Home"
@@ -227,7 +226,7 @@ export function AppHeader() {
                 Structural Steel Calculators
               </span>
             </span>
-          </Link>
+          </a>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -251,7 +250,7 @@ export function AppHeader() {
                   </div>
                 ) : null}
                 {projectStatus.items.map((i) => (
-                  <Link
+                  <a
                     key={i.href}
                     href={i.href}
                     className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
@@ -260,7 +259,7 @@ export function AppHeader() {
                     <span className="shrink-0 text-xs font-semibold text-slate-600">
                       {i.ts ? `Saved ${formatRelative(i.ts) ?? "recently"}` : "No data"}
                     </span>
-                  </Link>
+                  </a>
                 ))}
                 <div className="mt-2 border-t border-slate-100 pt-2">
                   <button
@@ -286,13 +285,13 @@ export function AppHeader() {
               </div>
               <div className="p-2">
                 {[{ href: "/", label: "Home" }, ...modules, ...utility].map((i) => (
-                  <Link
+                  <a
                     key={i.href}
                     href={i.href}
                     className="block rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
                   >
                     {i.label}
-                  </Link>
+                  </a>
                 ))}
               </div>
             </div>
@@ -351,7 +350,7 @@ export function AppHeader() {
 function NavPill(props: { href: string; label: string; short?: string; active: boolean }) {
   const label = props.short ?? props.label;
   return (
-    <Link
+    <a
       href={props.href}
       aria-current={props.active ? "page" : undefined}
       className={[
@@ -363,7 +362,7 @@ function NavPill(props: { href: string; label: string; short?: string; active: b
       title={props.label}
     >
       {label}
-    </Link>
+    </a>
   );
 }
 

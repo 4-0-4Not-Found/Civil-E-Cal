@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -161,7 +159,6 @@ function previewLineFor(key: ModuleKey): string | null {
 }
 
 export function HomeDashboard() {
-  const router = useRouter();
   const [tick, setTick] = useState(0);
   /** false until after mount — SSR and first client paint must not read localStorage (differs from server HTML). */
   const [mounted, setMounted] = useState(false);
@@ -296,7 +293,7 @@ export function HomeDashboard() {
         }}
         onConfirm={() => {
           setRestoreOpen(false);
-          if (resumeHref) router.push(resumeHref);
+          if (resumeHref) window.location.assign(resumeHref);
         }}
       />
       <Card className="border-slate-200">
@@ -325,11 +322,11 @@ export function HomeDashboard() {
 
             <div className="grid gap-2 sm:flex sm:flex-wrap md:justify-end">
               {resumeHref ? (
-                <Link href={resumeHref} className="w-full sm:w-auto">
+                <a href={resumeHref} className="w-full sm:w-auto">
                   <Button variant="primary" className="w-full sm:w-auto">
                     Continue
                   </Button>
-                </Link>
+                </a>
               ) : null}
               <a href="#modules" className="w-full sm:w-auto">
                 <Button variant="secondary" className="w-full sm:w-auto">
@@ -340,16 +337,16 @@ export function HomeDashboard() {
           </div>
 
           <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-            <Link href="/report" className="w-full sm:w-auto">
+            <a href="/report" className="w-full sm:w-auto">
               <Button variant="secondary" size="sm" className="w-full sm:w-auto">
                 Report (Print/PDF)
               </Button>
-            </Link>
-            <Link href="/info" className="w-full sm:w-auto">
+            </a>
+            <a href="/info" className="w-full sm:w-auto">
               <Button variant="secondary" size="sm" className="w-full sm:w-auto">
                 Info & units
               </Button>
-            </Link>
+            </a>
             <InstallAppButton />
           </div>
         </CardBody>
@@ -368,7 +365,7 @@ export function HomeDashboard() {
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {recent.map(({ m, s }) => (
-                <Link
+                <a
                   key={m.key}
                   href={m.href}
                   className="no-underline rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:border-[color:var(--brand)]/35 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
@@ -384,7 +381,7 @@ export function HomeDashboard() {
                     </div>
                     <Badge tone="good">READY</Badge>
                   </div>
-                </Link>
+                </a>
               ))}
             </div>
           </CardBody>
@@ -501,7 +498,7 @@ export function HomeDashboard() {
             const s = moduleState[m.key];
             const saved = s?.savedTs ? formatSaved(s.savedTs) : null;
             return (
-              <Link
+              <a
                 key={m.key}
                 href={m.href}
                 className="no-underline rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm transition hover:border-[color:var(--brand)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
@@ -528,7 +525,7 @@ export function HomeDashboard() {
                   <span>{s?.hasData ? (saved ? `Last saved: ${saved}` : "Saved inputs found") : "No saved inputs yet"}</span>
                   <span className="text-[color:var(--brand)]">Open →</span>
                 </div>
-              </Link>
+              </a>
             );
           })}
         </div>
