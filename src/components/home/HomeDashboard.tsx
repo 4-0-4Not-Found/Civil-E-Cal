@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProjectBackupPanel } from "@/components/ProjectBackupPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { BrandLink } from "@/components/ui/BrandLink";
 import { STORAGE } from "@/lib/storage/keys";
 
 type ModuleKey = keyof typeof STORAGE;
@@ -191,6 +192,7 @@ export function HomeDashboard() {
 
   const resumeHref = useMemo(() => {
     if (!mounted) return null;
+    void tick;
     try {
       const last = localStorage.getItem("ssc:lastRoute");
       if (!last || last === "/") return null;
@@ -213,6 +215,7 @@ export function HomeDashboard() {
 
   const moduleState = useMemo(() => {
     if (!mounted) return emptyModuleState();
+    void tick;
     const out: Record<string, { hasData: boolean; savedTs: number | null }> = {};
     for (const m of modules) {
       const k = STORAGE[m.key];
@@ -226,11 +229,13 @@ export function HomeDashboard() {
 
   const favorites = useMemo(() => {
     if (!mounted) return [];
+    void tick;
     return readFavorites();
   }, [tick, mounted]);
 
   const orderedModules = useMemo(() => {
     if (!mounted) return modules;
+    void tick;
     const order = readHomeOrder();
     if (!order) return modules;
     const byHref = new Map(modules.map((m) => [m.href, m] as const));
@@ -257,12 +262,13 @@ export function HomeDashboard() {
 
   const recent = useMemo(() => {
     if (!mounted) return [];
+    void tick;
     return modulesWithPreview
       .map((m) => ({ m, s: moduleState[m.key] }))
       .filter((x) => x.s?.hasData)
       .sort((a, b) => (b.s?.savedTs ?? 0) - (a.s?.savedTs ?? 0))
       .slice(0, 4);
-  }, [moduleState, modulesWithPreview, mounted]);
+  }, [moduleState, modulesWithPreview, mounted, tick]);
 
   return (
     <div className="space-y-6">
@@ -356,9 +362,9 @@ export function HomeDashboard() {
           <CardBody className="space-y-3">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-sm font-bold text-slate-950">Recent work</p>
-              <Link href="/report" className="text-sm font-semibold text-[color:var(--brand)] hover:underline">
+              <BrandLink href="/report" className="text-sm">
                 Open report
-              </Link>
+              </BrandLink>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {recent.map(({ m, s }) => (

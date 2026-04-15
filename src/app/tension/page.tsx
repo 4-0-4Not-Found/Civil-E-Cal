@@ -340,7 +340,7 @@ export default function TensionModulePage() {
           description="Yielding, rupture, block shear (J4.3), optional staggered net width. Check or design mode. Inputs save in this browser."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
-          <div className="md:col-span-12">
+          <div className="md:col-span-12 md:hidden">
             <PageSectionNav
               sections={[
                 { id: "tension-general", label: "General" },
@@ -695,6 +695,16 @@ export default function TensionModulePage() {
 
           <aside className="md:col-span-4">
             <div className="sticky top-6 md:top-[calc(var(--app-header-h,104px)+16px)] space-y-4">
+              <div className="hidden md:block">
+                <PageSectionNav
+                  sections={[
+                    { id: "tension-general", label: "General" },
+                    { id: "tension-net-area", label: "Net area" },
+                    { id: "tension-block-shear", label: "Block shear" },
+                    { id: "tension-steps", label: "Steps" },
+                  ]}
+                />
+              </div>
               <CalculatorActionRail
                 desktopClassName="hidden md:block"
                 hideMobileBar

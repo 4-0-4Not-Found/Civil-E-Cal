@@ -25,7 +25,7 @@ import { PageFooterNav } from "@/components/navigation/PageFooterNav";
 import { TextInputWithUnit } from "@/components/ui/InputGroup";
 import { Button } from "@/components/ui/Button";
 import { CalculatorActionRail } from "@/components/actions/CalculatorActionRail";
-import { PageSectionNav } from "@/components/navigation/PageSectionNav";
+import { PageSectionLayout } from "@/components/navigation/PageSectionLayout";
 
 export default function ConnectionsPage() {
   const [hydrated, setHydrated] = useState(false);
@@ -511,140 +511,143 @@ export default function ConnectionsPage() {
           description="LRFD or ASD — bolts, welds, and optional groove/prying helpers. Inputs auto-save in this browser."
         />
         <CardBody className="flex flex-col gap-6">
-          <PageSectionNav
+          <PageSectionLayout
             sections={[
               { id: "conn-inputs", label: "Inputs" },
               { id: "conn-results", label: "Bolt results" },
               { id: "conn-weld", label: "Fillet weld" },
               { id: "conn-optional", label: "Optional" },
             ]}
-          />
-          <CalculatorActionRail
-            hideMobileBar
-            title="Actions"
-            subtitle={`${designMethod} · ${shearMode === "slip" ? "Slip-critical" : "Bearing"} · ${boltGroup} d=${dBolt} in`}
-            savedKey="ssc:ts:connections"
-            saving={saving}
-            savedAt={savedAt}
-            compare={{
-              storageKey: "ssc:compare:connections",
-              getCurrent: () => ({
-                title: "Connections",
-                lines: [
-                  `Method: ${designMethod} · Shear mode: ${shearMode}`,
-                  `Vu: ${vu} kips · Tu: ${tu} kips`,
-                  `Bolt: ${boltGroup} d=${dBolt} in n=${nBolts} planes=${shearPlanes} threads=${threadMode}`,
-                  interactionOut && Number(tu) > 0 ? `Interaction Σ: ${interactionOut.interactionSum.toFixed(6)}` : null,
-                  shearMode === "slip" && slipOut ? `Available slip: ${slipOut.availableSlip.toFixed(6)} kips` : null,
-                  boltOut ? `Governing shear/bearing: ${boltOut.phiRnTotalGoverning.toFixed(6)} kips` : null,
-                  tensionOut ? `Bolt tension φRn total: ${tensionOut.phiRnTotal.toFixed(6)} kips` : null,
-                  weldOut ? `Fillet weld φRn: ${weldOut.phiRn.toFixed(6)} kips` : null,
-                  grooveOut ? `Groove weld: ${grooveOut.phiRnOrAllowableKips.toFixed(6)} kips` : null,
-                ].filter(Boolean) as string[],
-              }),
-            }}
-            copyText={() =>
-              [
-                "Connections",
-                `Method: ${designMethod}`,
-                `Shear mode: ${shearMode}`,
-                `Vu: ${vu} kips`,
-                `Tu: ${tu} kips`,
-                `Bolt: ${boltGroup} d=${dBolt} in n=${nBolts} planes=${shearPlanes} threads=${threadMode}`,
-                interactionOut && Number(tu) > 0 ? `Interaction Σ: ${interactionOut.interactionSum.toFixed(6)}` : null,
-                shearMode === "slip" && slipOut ? `Available slip: ${slipOut.availableSlip.toFixed(6)} kips` : null,
-                boltOut ? `Governing shear/bearing: ${boltOut.phiRnTotalGoverning.toFixed(6)} kips` : null,
-                tensionOut ? `Bolt tension φRn total: ${tensionOut.phiRnTotal.toFixed(6)} kips` : null,
-                weldOut ? `Fillet weld φRn: ${weldOut.phiRn.toFixed(6)} kips` : null,
-                grooveOut ? `Groove weld: ${grooveOut.phiRnOrAllowableKips.toFixed(6)} kips` : null,
-              ]
-                .filter(Boolean)
-                .join("\n")
-            }
-            onGoResults={() => scrollTo("results")}
-            onGoSteps={() => scrollTo("conn-results")}
-            csv={{ filename: "connections-export.csv", rows: csvRows }}
-            json={{
-              data: {
-                bolt: boltOut,
-                slip: slipOut,
-                tension: tensionOut,
-                interaction: interactionOut,
-                weld: weldOut,
-                grooveWeld: grooveOut,
-                pryingPlate: pryingOut,
-                inputs: {
-                  designMethod,
-                  shearMode,
-                  surfaceClass,
-                  slipHf,
-                  vu,
-                  tu,
-                  boltGroup,
-                  threadMode,
-                  dBolt,
-                  nBolts,
-                  shearPlanes,
-                  checkBearing,
-                  plateFu,
-                  plateT,
-                  lcMin,
-                  fexx,
-                  legIn,
-                  weldLen,
-                  weldDemand,
-                  grooveThroatIn,
-                  grooveLenIn,
-                  grooveDemand,
-                  pryingTPerBoltOverride,
-                  pryingBPrimeIn,
-                  pryingStripWidthIn,
-                  pryingFyKsi,
-                },
-              },
-            }}
-            onReset={resetInputs}
-          />
-          <div id="results">
-          <ResultHero
-            status={overallStatus}
-            title="Overall"
-            governing={
-              interactionOut && Number(tu) > 0
-                ? `Interaction Σ = ${interactionOut.interactionSum.toFixed(4)}`
-                : shearMode === "slip" && slipOut
-                  ? "Slip-critical (J3.8)"
-                  : boltOut
-                    ? `Bolt check (${boltOut.controlling})`
-                    : "Enter inputs to evaluate"
-            }
-            capacityLabel="Key capacity"
-            capacity={
-              shearMode === "slip" && slipOut
-                ? `${slipOut.availableSlip.toFixed(3)} kips (available slip)`
-                : boltOut
-                  ? `${(designMethod === "LRFD"
-                      ? boltOut.phiRnTotalGoverning
-                      : lrfdToAsdSamePhiOmega(boltOut.phiRnTotalGoverning)
-                    ).toFixed(3)} kips (governing shear/bearing)`
-                  : "—"
-            }
-            demandLabel="Demand"
-            demand={`${Number(vu).toFixed(3)} kips shear${Number(tu) > 0 ? ` · ${Number(tu).toFixed(3)} kips tension` : ""}`}
-            utilization={
-              interactionOut && Number(tu) > 0
-                ? interactionOut.interactionSum
-                : shearMode === "slip" && slipOut
-                  ? Number(vu) / slipOut.availableSlip
-                  : boltOut
-                    ? Number(vu) /
-                      (designMethod === "LRFD"
-                        ? boltOut.phiRnTotalGoverning
-                        : lrfdToAsdSamePhiOmega(boltOut.phiRnTotalGoverning))
-                    : undefined
-            }
-          />
-          </div>
+          >
+            <div className="space-y-6">
+              <CalculatorActionRail
+                hideMobileBar
+                title="Actions"
+                subtitle={`${designMethod} · ${shearMode === "slip" ? "Slip-critical" : "Bearing"} · ${boltGroup} d=${dBolt} in`}
+                savedKey="ssc:ts:connections"
+                saving={saving}
+                savedAt={savedAt}
+                compare={{
+                  storageKey: "ssc:compare:connections",
+                  getCurrent: () => ({
+                    title: "Connections",
+                    lines: [
+                      `Method: ${designMethod} · Shear mode: ${shearMode}`,
+                      `Vu: ${vu} kips · Tu: ${tu} kips`,
+                      `Bolt: ${boltGroup} d=${dBolt} in n=${nBolts} planes=${shearPlanes} threads=${threadMode}`,
+                      interactionOut && Number(tu) > 0 ? `Interaction Σ: ${interactionOut.interactionSum.toFixed(6)}` : null,
+                      shearMode === "slip" && slipOut ? `Available slip: ${slipOut.availableSlip.toFixed(6)} kips` : null,
+                      boltOut ? `Governing shear/bearing: ${boltOut.phiRnTotalGoverning.toFixed(6)} kips` : null,
+                      tensionOut ? `Bolt tension φRn total: ${tensionOut.phiRnTotal.toFixed(6)} kips` : null,
+                      weldOut ? `Fillet weld φRn: ${weldOut.phiRn.toFixed(6)} kips` : null,
+                      grooveOut ? `Groove weld: ${grooveOut.phiRnOrAllowableKips.toFixed(6)} kips` : null,
+                    ].filter(Boolean) as string[],
+                  }),
+                }}
+                copyText={() =>
+                  [
+                    "Connections",
+                    `Method: ${designMethod}`,
+                    `Shear mode: ${shearMode}`,
+                    `Vu: ${vu} kips`,
+                    `Tu: ${tu} kips`,
+                    `Bolt: ${boltGroup} d=${dBolt} in n=${nBolts} planes=${shearPlanes} threads=${threadMode}`,
+                    interactionOut && Number(tu) > 0 ? `Interaction Σ: ${interactionOut.interactionSum.toFixed(6)}` : null,
+                    shearMode === "slip" && slipOut ? `Available slip: ${slipOut.availableSlip.toFixed(6)} kips` : null,
+                    boltOut ? `Governing shear/bearing: ${boltOut.phiRnTotalGoverning.toFixed(6)} kips` : null,
+                    tensionOut ? `Bolt tension φRn total: ${tensionOut.phiRnTotal.toFixed(6)} kips` : null,
+                    weldOut ? `Fillet weld φRn: ${weldOut.phiRn.toFixed(6)} kips` : null,
+                    grooveOut ? `Groove weld: ${grooveOut.phiRnOrAllowableKips.toFixed(6)} kips` : null,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")
+                }
+                onGoResults={() => scrollTo("results")}
+                onGoSteps={() => scrollTo("conn-results")}
+                csv={{ filename: "connections-export.csv", rows: csvRows }}
+                json={{
+                  data: {
+                    bolt: boltOut,
+                    slip: slipOut,
+                    tension: tensionOut,
+                    interaction: interactionOut,
+                    weld: weldOut,
+                    grooveWeld: grooveOut,
+                    pryingPlate: pryingOut,
+                    inputs: {
+                      designMethod,
+                      shearMode,
+                      surfaceClass,
+                      slipHf,
+                      vu,
+                      tu,
+                      boltGroup,
+                      threadMode,
+                      dBolt,
+                      nBolts,
+                      shearPlanes,
+                      checkBearing,
+                      plateFu,
+                      plateT,
+                      lcMin,
+                      fexx,
+                      legIn,
+                      weldLen,
+                      weldDemand,
+                      grooveThroatIn,
+                      grooveLenIn,
+                      grooveDemand,
+                      pryingTPerBoltOverride,
+                      pryingBPrimeIn,
+                      pryingStripWidthIn,
+                      pryingFyKsi,
+                    },
+                  },
+                }}
+                onReset={resetInputs}
+              />
+              <div id="results">
+                <ResultHero
+                  status={overallStatus}
+                  title="Overall"
+                  governing={
+                    interactionOut && Number(tu) > 0
+                      ? `Interaction Σ = ${interactionOut.interactionSum.toFixed(4)}`
+                      : shearMode === "slip" && slipOut
+                        ? "Slip-critical (J3.8)"
+                        : boltOut
+                          ? `Bolt check (${boltOut.controlling})`
+                          : "Enter inputs to evaluate"
+                  }
+                  capacityLabel="Key capacity"
+                  capacity={
+                    shearMode === "slip" && slipOut
+                      ? `${slipOut.availableSlip.toFixed(3)} kips (available slip)`
+                      : boltOut
+                        ? `${(designMethod === "LRFD"
+                            ? boltOut.phiRnTotalGoverning
+                            : lrfdToAsdSamePhiOmega(boltOut.phiRnTotalGoverning)
+                          ).toFixed(3)} kips (governing shear/bearing)`
+                        : "—"
+                  }
+                  demandLabel="Demand"
+                  demand={`${Number(vu).toFixed(3)} kips shear${Number(tu) > 0 ? ` · ${Number(tu).toFixed(3)} kips tension` : ""}`}
+                  utilization={
+                    interactionOut && Number(tu) > 0
+                      ? interactionOut.interactionSum
+                      : shearMode === "slip" && slipOut
+                        ? Number(vu) / slipOut.availableSlip
+                        : boltOut
+                          ? Number(vu) /
+                            (designMethod === "LRFD"
+                              ? boltOut.phiRnTotalGoverning
+                              : lrfdToAsdSamePhiOmega(boltOut.phiRnTotalGoverning))
+                          : undefined
+                  }
+                />
+              </div>
+            </div>
+          </PageSectionLayout>
 
           <details open className="rounded-2xl border border-slate-200 bg-white" id="conn-inputs">
             <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">

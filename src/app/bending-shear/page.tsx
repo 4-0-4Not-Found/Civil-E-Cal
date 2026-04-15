@@ -309,7 +309,7 @@ export default function BendingShearPage() {
           description="Simply supported strong axis: rolled W-shapes (full F6/F2) or rectangular HSS (approximate F7/G-style limits in-engine). Design mode suggests lightest W only. Inputs save in this browser."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
-          <div className="md:col-span-12">
+          <div className="md:col-span-12 md:hidden">
             <PageSectionNav
               sections={[
                 { id: "beam-general", label: "General" },
@@ -536,6 +536,16 @@ export default function BendingShearPage() {
           <aside className="md:col-span-4">
             {out ? (
               <div className="sticky top-6 md:top-[calc(var(--app-header-h,104px)+16px)] space-y-4">
+                <div className="hidden md:block">
+                  <PageSectionNav
+                    sections={[
+                      { id: "beam-general", label: "General" },
+                      { id: "beam-loads", label: "Loads" },
+                      { id: "beam-check", label: "Checks" },
+                      { id: "beam-steps", label: "Steps" },
+                    ]}
+                  />
+                </div>
                 <CalculatorActionRail
                   hideMobileBar
                   title="Actions"

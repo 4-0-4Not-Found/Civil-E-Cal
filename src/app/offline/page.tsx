@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageFooterNav } from "@/components/navigation/PageFooterNav";
 import { RetryReloadButton } from "@/components/offline/RetryReloadButton";
+import { BrandLink } from "@/components/ui/BrandLink";
 
 export default function OfflinePage() {
   return (
@@ -14,12 +15,9 @@ export default function OfflinePage() {
           right={
             <div className="flex items-center gap-2">
               <RetryReloadButton />
-              <Link
-                href="/"
-                className="text-sm font-semibold text-[color:var(--brand)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
-              >
+              <BrandLink href="/" className="text-sm">
                 Go Home
-              </Link>
+              </BrandLink>
             </div>
           }
         />

@@ -23,6 +23,7 @@ export function ModuleProgressPanel() {
   }, []);
 
   const status = useMemo(() => {
+    void tick;
     const out: Record<string, { hasData: boolean }> = {};
     for (const m of modules) {
       const k = STORAGE[m.key];
@@ -32,6 +33,7 @@ export function ModuleProgressPanel() {
   }, [tick]);
 
   const resumeHref = useMemo(() => {
+    void tick;
     try {
       if (typeof window === "undefined") return null;
       const last = localStorage.getItem("ssc:lastRoute");

@@ -16,6 +16,7 @@ export function useModalA11y(opts: {
   /** Container that bounds focus. */
   containerRef: React.RefObject<HTMLElement | null>;
 }) {
+  const { open, onClose, initialFocusRef, containerRef } = opts;
   const lastActiveRef = useRef<HTMLElement | null>(null);
 
   const focusableSelector = useMemo(
@@ -32,7 +33,7 @@ export function useModalA11y(opts: {
   );
 
   useEffect(() => {
-    if (!opts.open) return;
+    if (!open) return;
 
     lastActiveRef.current = (document.activeElement as HTMLElement | null) ?? null;
 
@@ -40,17 +41,17 @@ export function useModalA11y(opts: {
     document.body.style.overflow = "hidden";
 
     queueMicrotask(() => {
-      opts.initialFocusRef?.current?.focus?.();
+      initialFocusRef?.current?.focus?.();
     });
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        opts.onClose();
+        onClose();
         return;
       }
       if (e.key !== "Tab") return;
-      const root = opts.containerRef.current;
+      const root = containerRef.current;
       if (!root) return;
 
       const nodes = getFocusable(root, focusableSelector);
@@ -73,10 +74,10 @@ export function useModalA11y(opts: {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [opts.open, opts.onClose, opts.containerRef, opts.initialFocusRef, focusableSelector]);
+  }, [open, onClose, containerRef, initialFocusRef, focusableSelector]);
 
   useEffect(() => {
-    if (opts.open) return;
+    if (open) return;
     try {
       lastActiveRef.current?.focus?.();
     } catch {
@@ -84,7 +85,7 @@ export function useModalA11y(opts: {
     } finally {
       lastActiveRef.current = null;
     }
-  }, [opts.open]);
+  }, [open]);
 }
 
 export const modalOverlayClass =

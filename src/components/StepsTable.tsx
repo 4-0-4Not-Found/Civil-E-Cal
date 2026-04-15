@@ -121,21 +121,21 @@ function Table(props: { steps: CalculationStep[] }) {
       <table className="min-w-full text-left text-sm">
         <thead className="bg-slate-50 text-slate-700">
           <tr>
-            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-3 font-semibold">Step</th>
-            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-3 font-semibold">Formula</th>
-            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-3 font-semibold text-right">Value</th>
-            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-3 font-semibold">Note</th>
+            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide">Step</th>
+            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide">Formula</th>
+            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide">Value</th>
+            <th scope="col" className="sticky top-0 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide">Note</th>
           </tr>
         </thead>
         <tbody className="bg-white">
           {props.steps.map((s, idx) => (
             <tr key={s.id} className={idx % 2 === 1 ? "border-t border-slate-100 bg-slate-50/40" : "border-t border-slate-100"}>
-              <td className="px-4 py-3 font-medium text-slate-950">{s.label}</td>
+              <td className="px-4 py-2.5 text-sm font-medium text-slate-950">{s.label}</td>
               <td className="px-4 py-3 font-mono text-xs text-slate-700">{s.formula ?? "-"}</td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
+              <td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-slate-950">
                 {formatStepValue(s)}
               </td>
-              <td className="px-4 py-3 text-slate-700">{s.note ?? "-"}</td>
+              <td className="px-4 py-2.5 text-sm text-slate-700">{s.note ?? "-"}</td>
             </tr>
           ))}
         </tbody>

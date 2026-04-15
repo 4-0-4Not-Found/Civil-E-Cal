@@ -114,49 +114,53 @@ export function CompareDrawer(props: {
   const [tick, setTick] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const { open, onClose, storageKey, getCurrent } = props;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useModalA11y({
-    open: props.open,
-    onClose: props.onClose,
+    open,
+    onClose,
     initialFocusRef: closeRef,
     containerRef: panelRef,
   });
 
   useEffect(() => {
-    if (!props.open) return;
+    if (!open) return;
     queueMicrotask(() => setTick((t) => t + 1));
-  }, [props.open]);
+  }, [open]);
 
-  const pinned = useMemo(() => readPinned(props.storageKey), [props.storageKey, tick]);
+  const pinned = useMemo(() => {
+    void tick;
+    return readPinned(storageKey);
+  }, [storageKey, tick]);
   const snapshot = useMemo(
-    () => (props.open ? props.getCurrent() : { title: "", lines: [] }),
-    [props.open, props.getCurrent],
+    () => (open ? getCurrent() : { title: "", lines: [] }),
+    [open, getCurrent],
   );
   const [currentTs, setCurrentTs] = useState(0);
   useEffect(() => {
-    if (!props.open) {
+    if (!open) {
       queueMicrotask(() => setCurrentTs(0));
       return;
     }
     queueMicrotask(() => setCurrentTs(Date.now()));
-  }, [props.open]);
+  }, [open]);
 
   const current = snapshot.lines;
-  const pinnedLines = pinned?.lines ?? [];
+  const pinnedLines = useMemo(() => pinned?.lines ?? [], [pinned]);
   const currentMetrics = useMemo(() => parseMetrics(current), [current]);
   const pinnedMetrics = useMemo(() => parseMetrics(pinnedLines), [pinnedLines]);
 
-  if (!mounted || !props.open) return null;
+  if (!mounted || !open) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[90]">
       <div
         className={modalOverlayClass}
-        onMouseDown={props.onClose}
+        onMouseDown={onClose}
         aria-hidden="true"
       />
       <div
@@ -183,7 +187,7 @@ export function CompareDrawer(props: {
               size="sm"
               type="button"
               onClick={() => {
-                writePinned(props.storageKey, {
+                writePinned(storageKey, {
                   ts: Date.now(),
                   title: snapshot.title,
                   lines: snapshot.lines,
@@ -200,7 +204,7 @@ export function CompareDrawer(props: {
               disabled={!pinned}
               onClick={() => {
                 try {
-                  localStorage.removeItem(props.storageKey);
+                  localStorage.removeItem(storageKey);
                 } catch {
                   /* ignore */
                 }
@@ -210,7 +214,7 @@ export function CompareDrawer(props: {
             >
               Clear pinned
             </Button>
-            <Button ref={closeRef} variant="ghost" size="sm" type="button" onClick={props.onClose}>
+            <Button ref={closeRef} variant="ghost" size="sm" type="button" onClick={onClose}>
               Close
             </Button>
           </div>

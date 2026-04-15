@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageFooterNav } from "@/components/navigation/PageFooterNav";
-import { PageSectionNav } from "@/components/navigation/PageSectionNav";
+import { PageSectionLayout } from "@/components/navigation/PageSectionLayout";
+import { BrandLink } from "@/components/ui/BrandLink";
 
 /** Help: capabilities, limits, units, and tips for students. */
 export default function InfoPage() {
@@ -14,15 +14,14 @@ export default function InfoPage() {
           description="AISC 360–based steel checks using the v16 shape database. Works offline after the first load (PWA). Use Summary to print or review inputs and key results together."
         />
         <CardBody className="max-w-none space-y-4 text-slate-800">
-          <PageSectionNav
+          <PageSectionLayout
             sections={[
               { id: "info-capabilities", label: "Capabilities" },
               { id: "info-limits", label: "Limitations" },
               { id: "info-units", label: "Units" },
               { id: "info-tips", label: "Tips" },
             ]}
-          />
-
+          >
           <details id="info-capabilities" open className="rounded-2xl border border-slate-200 bg-white">
             <summary className="min-h-11 cursor-pointer px-4 py-3.5 text-sm font-extrabold tracking-tight text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 sm:px-5 sm:py-4">
               What you can do
@@ -115,9 +114,8 @@ export default function InfoPage() {
             <div className="border-t border-slate-200 p-5">
               <ul className="list-disc space-y-2 pl-5 text-sm">
               <li>
-                Open each calculator from <Link href="/" className="text-[color:var(--brand)] hover:underline">Home</Link> — each module has
-                its own full-width layout. Use <Link href="/report" className="text-[color:var(--brand)] hover:underline">Report</Link> for a
-                combined view of saved inputs.
+                Open each calculator from <BrandLink href="/">Home</BrandLink> — each module has its own full-width layout. Use{" "}
+                <BrandLink href="/report">Report</BrandLink> for a combined view of saved inputs.
               </li>
               <li>
                 Export <strong>CSV</strong> or <strong>JSON</strong> on each module to archive work or open CSV in Excel.
@@ -127,12 +125,12 @@ export default function InfoPage() {
                 backup file.
               </li>
               <li>
-                Use <Link href="/report" className="text-[color:var(--brand)] hover:underline">Report</Link> (also linked on Home) for a
-                printable overview when you have saved inputs.
+                Use <BrandLink href="/report">Report</BrandLink> (also linked on Home) for a printable overview when you have saved inputs.
               </li>
               </ul>
             </div>
           </details>
+          </PageSectionLayout>
         </CardBody>
       </Card>
       <PageFooterNav currentHref="/info" />

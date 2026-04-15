@@ -125,11 +125,12 @@ export function ConfirmDialog(props: {
             type="button"
             variant={destructive ? "danger" : "primary"}
             onClick={onConfirm}
-            className={
+            className={cn(
+              "rounded-full px-5",
               destructive
                 ? "border-0 bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/30 dark:bg-red-600 dark:hover:bg-red-700"
-                : "rounded-full border border-[color:var(--brand)] bg-white px-5 text-[color:var(--brand)] shadow-sm hover:bg-[color:var(--brand)]/5 focus-visible:ring-[color:var(--brand)]/15"
-            }
+                : null,
+            )}
           >
             {confirmLabel}
           </Button>

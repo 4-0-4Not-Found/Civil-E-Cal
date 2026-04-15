@@ -50,7 +50,7 @@ export function ProjectBackupPanel() {
 
   const clearAll = useCallback(() => {
     setConfirmClearOpen(true);
-  }, [toast]);
+  }, []);
 
   const doClearAll = useCallback(() => {
     Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));

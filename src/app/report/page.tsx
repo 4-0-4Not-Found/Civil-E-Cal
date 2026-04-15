@@ -6,7 +6,8 @@ import type { BeamLimitStates, CalculationOutput, CalculationResult, Calculation
 import { readModuleStoresFromLocalStorage, summarizeModuleStores } from "@/lib/report/snapshot-store";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageFooterNav } from "@/components/navigation/PageFooterNav";
-import { PageSectionNav } from "@/components/navigation/PageSectionNav";
+import { PageSectionLayout } from "@/components/navigation/PageSectionLayout";
+import { Button } from "@/components/ui/Button";
 
 function formatNumberForReport(v: number): string {
   if (!Number.isFinite(v)) {
@@ -195,26 +196,22 @@ export default function ReportPage() {
           description="Snapshot from inputs saved in this browser. Detailed steps below match the calculators. Use Print to save as PDF."
           right={
             <div className="flex gap-2 print:hidden">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="min-h-11 rounded-lg bg-[color:var(--action)] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#e24f16] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--action)]/20"
-              >
+              <Button variant="primary" size="sm" type="button" onClick={() => window.print()}>
                 Print / Save PDF
-              </button>
+              </Button>
             </div>
           }
         />
         <CardBody className="space-y-4 text-sm text-slate-800">
-          <PageSectionNav
+          <PageSectionLayout
             sections={[
               { id: "report-tension", label: "Tension" },
               { id: "report-compression", label: "Compression" },
               { id: "report-beam", label: "Beam" },
               { id: "report-connections", label: "Connections" },
             ]}
-            className="print:hidden"
-          />
+            navClassName="print:hidden"
+          >
           {!mounted ? (
             <p className="text-slate-600">Loading…</p>
           ) : (
@@ -376,6 +373,7 @@ export default function ReportPage() {
               </details>
             </>
           )}
+          </PageSectionLayout>
         </CardBody>
       </Card>
       <PageFooterNav currentHref="/report" />

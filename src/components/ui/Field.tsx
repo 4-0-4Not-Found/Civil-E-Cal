@@ -13,15 +13,15 @@ export function Field(props: {
   const errorId = `${id}-error`;
   return (
     <label className={cn("flex flex-col gap-1.5", props.className)}>
-      <span className="text-sm font-semibold text-slate-900 sm:text-base">{props.label}</span>
+      <span className="text-sm font-semibold text-slate-900">{props.label}</span>
       {props.hint ? (
-        <span id={hintId} className="text-sm text-slate-600">
+        <span id={hintId} className="text-xs leading-relaxed text-slate-600">
           {props.hint}
         </span>
       ) : null}
       {props.children}
       {props.error ? (
-        <span id={errorId} className="text-sm font-semibold text-[color:var(--action)]">
+        <span id={errorId} className="text-xs font-semibold text-[color:var(--action)]">
           {props.error}
         </span>
       ) : null}
@@ -40,7 +40,7 @@ export function TextInput(props: {
     <div className="relative">
       <input
         className={cn(
-          "w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-950 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10",
+          "w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10",
           canClear ? "pr-10" : null,
         )}
         value={props.value}
@@ -68,7 +68,7 @@ export function SelectInput(props: {
 }) {
   return (
     <select
-      className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base font-semibold text-black shadow-sm outline-none focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
+      className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-black shadow-sm outline-none focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
       value={props.value}
       onChange={(e) => props.onChange(e.target.value)}
     >

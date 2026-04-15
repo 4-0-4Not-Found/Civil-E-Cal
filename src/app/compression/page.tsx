@@ -168,7 +168,7 @@ export default function CompressionPage() {
           description="Column buckling (E3), LRFD or ASD. Slender-element limits are approximate when shape data is available. Inputs save in this browser."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
-          <div className="md:col-span-12">
+          <div className="md:col-span-12 md:hidden">
             <PageSectionNav
               sections={[
                 { id: "compression-general", label: "General" },
@@ -318,6 +318,15 @@ export default function CompressionPage() {
 
           <aside className="md:col-span-4">
             <div className="sticky top-6 md:top-[calc(var(--app-header-h,104px)+16px)] space-y-4">
+              <div className="hidden md:block">
+                <PageSectionNav
+                  sections={[
+                    { id: "compression-general", label: "General" },
+                    { id: "compression-member", label: "Member" },
+                    { id: "compression-steps", label: "Steps" },
+                  ]}
+                />
+              </div>
               <CalculatorActionRail
                 hideMobileBar
                 title="Actions"

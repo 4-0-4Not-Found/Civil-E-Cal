@@ -67,6 +67,8 @@ export function CalculatorActionRail(props: {
   }, [props.savedKey]);
 
   const savedLabel = useMemo(() => {
+    // savedTick intentionally triggers refresh for relative timestamps
+    void savedTick;
     // Avoid hydration mismatch: the server can't read localStorage and relative time depends on Date.now().
     // So we render no saved label until after first client mount.
     if (!hydrated) return null;

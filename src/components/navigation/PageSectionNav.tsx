@@ -16,6 +16,7 @@ export function PageSectionNav(props: {
 
   // #region agent log (on-this-page overlap)
   useEffect(() => {
+    void isDev;
     if (!isDev) return;
     const nav = navRef.current;
     if (!nav) return;
@@ -63,7 +64,7 @@ export function PageSectionNav(props: {
     const onScroll = () => sample("P2", "PageSectionNav after scroll");
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isDev]);
   // #endregion agent log (on-this-page overlap)
 
   if (props.sections.length === 0) return null;

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -113,7 +114,7 @@ export function AppHeader() {
     const ro = new ResizeObserver(() => apply("H2", "Header height changed (ResizeObserver)"));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pathname]);
+  }, [pathname, isDev]);
   // #endregion agent log (header height -> sticky offsets)
 
   // #region agent log (hydration)
@@ -132,13 +133,20 @@ export function AppHeader() {
         timestamp: Date.now(),
       }),
     }).catch(() => {});
-  }, []);
+  }, [isDev, pathname]);
   // #endregion agent log (hydration)
 
-  const lastSaved = useMemo(() => (mounted ? readLastSaved() : null), [mounted, tick, pathname]);
+  const lastSaved = useMemo(() => {
+    // tick + pathname intentionally trigger refresh of localStorage-derived UI
+    void tick;
+    void pathname;
+    return mounted ? readLastSaved() : null;
+  }, [mounted, tick, pathname]);
   const lastSavedLabel = lastSaved ? `${lastSaved.label} · ${formatRelative(lastSaved.ts) ?? "saved"}` : null;
 
   const projectStatus = useMemo(() => {
+    void tick;
+    void pathname;
     if (!mounted) return { items: [], completed: 0, total: 4 };
     try {
       const keys: Array<{ k: string; label: string; href: string }> = [
@@ -157,7 +165,7 @@ export function AppHeader() {
     } catch {
       return { items: [], completed: 0, total: 4 };
     }
-  }, [tick, pathname]);
+  }, [tick, pathname, mounted]);
 
   // Remember last visited route for a fast "Continue" on Home.
   // UI-only preference, no calculation logic.
@@ -196,26 +204,38 @@ export function AppHeader() {
           setTick((t) => t + 1);
         }}
       />
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
+      {/* Top row: branding + key status controls */}
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-2.5 md:px-8">
         <div className="min-w-0">
           <Link
             href="/"
-            className="block truncate text-sm font-extrabold tracking-tight text-slate-950 hover:text-[color:var(--brand)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
+            className="group flex min-w-0 items-center gap-4 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
             aria-label="Structural Steel Calculators — Home"
           >
-            Structural Steel Calculators
+            <Image
+              src="/brand/bu_logo.png"
+              alt="Bulacan University"
+              width={160}
+              height={160}
+              sizes="(min-width: 1024px) 68px, (min-width: 768px) 60px, (min-width: 640px) 52px, 48px"
+              quality={100}
+              priority
+              className="h-12 w-12 shrink-0 object-contain sm:h-[52px] sm:w-[52px] md:h-[60px] md:w-[60px] lg:h-[68px] lg:w-[68px]"
+            />
+            <span className="block min-w-0">
+              <span className="block truncate text-base font-extrabold tracking-tight text-slate-950 group-hover:text-[color:var(--brand)] md:text-lg">
+                Structural Steel Calculators
+              </span>
+            </span>
           </Link>
-          <p className="hidden truncate text-xs font-medium text-slate-600 sm:block">
-            Fast AISC-based checks for civil engineering students
-            {mounted && lastSavedLabel ? <span className="mx-2 text-slate-300" aria-hidden="true">•</span> : null}
-            {mounted && lastSavedLabel ? (
-              <span className="font-semibold text-slate-700">Last saved: {lastSavedLabel}</span>
-            ) : null}
-          </p>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Desktop: project status quickview */}
+          <div className="hidden md:block">
+            <CommandPaletteButton />
+          </div>
+
+          {/* Desktop: project status quickview (also hosts last-saved to keep header height stable) */}
           <details className="relative hidden md:block">
             <summary className="list-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 [&::-webkit-details-marker]:hidden">
               Progress {projectStatus.completed}/{projectStatus.total}
@@ -225,6 +245,11 @@ export function AppHeader() {
                 Project status (this device)
               </div>
               <div className="p-2">
+                {mounted && lastSavedLabel ? (
+                  <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                    <span className="font-semibold text-slate-900">Last saved:</span> {lastSavedLabel}
+                  </div>
+                ) : null}
                 {projectStatus.items.map((i) => (
                   <Link
                     key={i.href}
@@ -238,15 +263,9 @@ export function AppHeader() {
                   </Link>
                 ))}
                 <div className="mt-2 border-t border-slate-100 pt-2">
-                  <Link
-                    href="/report"
-                    className="block rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
-                  >
-                    Open report →
-                  </Link>
                   <button
                     type="button"
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
+                    className="mt-2 w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-left text-sm font-semibold text-red-800 shadow-sm hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20"
                     onClick={() => setClearOpen(true)}
                   >
                     Clear saved inputs…
@@ -278,40 +297,40 @@ export function AppHeader() {
               </div>
             </div>
           </details>
-          <div className="hidden md:block">
-            <CommandPaletteButton />
-          </div>
-          <Link
-            href="/report"
-            className="hidden rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 md:inline-flex"
-          >
-            Report
-          </Link>
-          <Link
-            href="/info"
-            className="hidden rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 md:inline-flex"
-          >
-            Info
-          </Link>
         </div>
       </div>
 
+      {/* Bottom row: modules (primary nav) + utilities (secondary) */}
       <nav className="border-t border-slate-100 bg-white">
         <div className="mx-auto w-full max-w-6xl px-2 md:px-6">
-          <div className="flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <NavPill href="/" label="Home" active={isActive(pathname, "/")} />
-            <div className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
-            {modules.map((item) => (
-              <NavPill
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                short={item.short}
-                active={isActive(pathname, item.href)}
-              />
-            ))}
-            <div className="mx-1 h-5 w-px bg-slate-200 md:hidden" aria-hidden="true" />
-            <div className="flex items-center gap-1 md:hidden">
+          <div className="flex items-center justify-between gap-2 py-2">
+            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <NavPill href="/" label="Home" active={isActive(pathname, "/")} />
+              <div className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
+              {modules.map((item) => (
+                <NavPill
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  short={item.short}
+                  active={isActive(pathname, item.href)}
+                />
+              ))}
+              <div className="mx-1 h-5 w-px bg-slate-200 md:hidden" aria-hidden="true" />
+              <div className="flex items-center gap-1 md:hidden">
+                {utility.map((item) => (
+                  <NavPill
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    short={item.short}
+                    active={isActive(pathname, item.href)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="hidden items-center gap-2 md:flex">
               {utility.map((item) => (
                 <NavPill
                   key={item.href}

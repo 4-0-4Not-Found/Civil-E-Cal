@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BREADCRUMB_LABELS } from "@/lib/ui/strings";
+import { BrandLink } from "@/components/ui/BrandLink";
 
 export function PageBreadcrumbs() {
   const pathname = usePathname() ?? "/";
@@ -29,12 +29,9 @@ export function PageBreadcrumbs() {
             {i === crumbs.length - 1 ? (
               <span className="text-slate-900 dark:text-slate-100">{c.label}</span>
             ) : (
-              <Link
-                href={c.href}
-                className="text-[color:var(--brand)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 dark:text-blue-300"
-              >
+              <BrandLink href={c.href} className="dark:text-blue-300">
                 {c.label}
-              </Link>
+              </BrandLink>
             )}
           </li>
         ))}

@@ -82,6 +82,7 @@ export function CommandPalette() {
 
   const favs = useMemo(() => {
     // readFavorites reads localStorage; keep it tied to a tick so we can refresh after toggles
+    void favoritesTick;
     return readFavorites();
   }, [favoritesTick]);
 

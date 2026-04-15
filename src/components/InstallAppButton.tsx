@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -40,7 +41,7 @@ export function InstallAppButton() {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, []);
+  }, [toast]);
 
   if (isStandalone) return <p className="text-xs text-slate-500">Installed app mode is active.</p>;
 
@@ -67,13 +68,9 @@ export function InstallAppButton() {
 
   return (
     <div className="w-full space-y-1 sm:w-auto">
-      <button
-        type="button"
-        onClick={onInstall}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-[color:var(--action)] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#e24f16] focus:outline-none focus:ring-4 focus:ring-[color:var(--action)]/20 sm:w-auto"
-      >
+      <Button variant="primary" type="button" onClick={onInstall} className="w-full sm:w-auto">
         Install app
-      </button>
+      </Button>
       {msg ? <p className="text-xs text-slate-600">{msg}</p> : null}
     </div>
   );

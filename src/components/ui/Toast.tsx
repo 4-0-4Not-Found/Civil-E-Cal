@@ -45,7 +45,7 @@ export function ToastProvider(props: { children: ReactNode }) {
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    return { push: (_t: Omit<ToastItem, "id">) => {} };
+    return { push: () => {} };
   }
   return ctx;
 }
