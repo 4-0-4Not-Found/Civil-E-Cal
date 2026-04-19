@@ -12,8 +12,8 @@ const pwaDefaultRuntimeCaching = require("next-pwa/cache") as Array<Record<strin
  * default `public/**` glob and drops manifest.json, icons, and other static precache entries,
  * which breaks offline installs. Use `manifestTransforms` below to append instead.
  */
+/** Extra app routes to precache (not already added by next-pwa: start URL `/`, fallback `/offline`). */
 const OFFLINE_SHELL_ROUTES = [
-  "/",
   "/tension",
   "/compression",
   "/bending-shear",
@@ -21,10 +21,51 @@ const OFFLINE_SHELL_ROUTES = [
   "/report",
   "/info",
   "/workspace",
-  "/offline",
 ];
 
-const APP_SHELL_REVISION = "app-shell-v5";
+const APP_SHELL_REVISION = "app-shell-v6";
+
+function normalizeManifestPath(url: string): string {
+  try {
+    const pathPart = url.includes("://") ? new URL(url).pathname : url;
+    const noQuery = pathPart.split("?")[0] ?? "/";
+    if (noQuery.length > 1 && noQuery.endsWith("/")) return noQuery.slice(0, -1);
+    return noQuery || "/";
+  } catch {
+    return url.split("?")[0] || "/";
+  }
+}
+
+function dedupePrecacheManifest(manifestEntries: Array<{ url: string; revision?: string | null }>) {
+  const byPath = new Map<string, { url: string; revision?: string | null }>();
+
+  const isAppShellRevision = (r: string) => /^app-shell-v\d+$/i.test(r);
+
+  const pick = (
+    a: { url: string; revision?: string | null },
+    b: { url: string; revision?: string | null },
+  ): { url: string; revision?: string | null } => {
+    const ar = String(a.revision ?? "");
+    const br = String(b.revision ?? "");
+    const aShell = isAppShellRevision(ar);
+    const bShell = isAppShellRevision(br);
+    if (aShell && !bShell) return b;
+    if (!aShell && bShell) return a;
+    return br.length >= ar.length ? b : a;
+  };
+
+  for (const m of manifestEntries) {
+    const key = normalizeManifestPath(m.url);
+    const prev = byPath.get(key);
+    if (!prev) {
+      byPath.set(key, m);
+      continue;
+    }
+    byPath.set(key, pick(prev, m));
+  }
+
+  return Array.from(byPath.values());
+}
 
 const pwaPlugin = withPWAInit({
   dest: "public",
@@ -38,20 +79,20 @@ const pwaPlugin = withPWAInit({
   fallbacks: {
     document: "/offline",
   },
-  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/, /^ref$/],
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/, /^ref$/, /^standalone$/, /^from$/],
   manifestTransforms: [
     async (manifestEntries: Array<{ url: string; revision?: string | null }>) => {
-      const normalize = (u: string) => u.replace(/%5B/g, "[").replace(/%5D/g, "]").split("?")[0];
-      const seen = new Set(manifestEntries.map((m) => normalize(m.url)));
+      const seenPaths = new Set(manifestEntries.map((m) => normalizeManifestPath(m.url)));
       const extra: Array<{ url: string; revision: string }> = [];
       for (const route of OFFLINE_SHELL_ROUTES) {
         const url = route.startsWith("/") ? route : `/${route}`;
-        if (!seen.has(url)) {
+        if (!seenPaths.has(normalizeManifestPath(url))) {
           extra.push({ url, revision: APP_SHELL_REVISION });
-          seen.add(url);
+          seenPaths.add(normalizeManifestPath(url));
         }
       }
-      return { manifest: [...manifestEntries, ...extra], warnings: [] };
+      const combined = [...manifestEntries, ...extra];
+      return { manifest: dedupePrecacheManifest(combined), warnings: [] };
     },
   ],
   runtimeCaching: [

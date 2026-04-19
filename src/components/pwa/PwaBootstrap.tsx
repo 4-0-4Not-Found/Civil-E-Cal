@@ -32,11 +32,7 @@ export function PwaBootstrap() {
         }
       };
 
-      for (const path of CORE_ROUTES) {
-        if (cancelled) return;
-        // eslint-disable-next-line no-await-in-loop
-        await warmOne(path);
-      }
+      await Promise.all(CORE_ROUTES.map((path) => (cancelled ? Promise.resolve() : warmOne(path))));
     };
 
     const run = async () => {
