@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 import withPWAInit from "next-pwa";
 
 /** next-pwa default Workbox routes — includes same-origin `others` cache used by register.js on SPA nav. */
@@ -23,9 +24,9 @@ const OFFLINE_SHELL_ROUTES = [
   "/offline",
 ];
 
-const APP_SHELL_REVISION = "app-shell-v4";
+const APP_SHELL_REVISION = "app-shell-v5";
 
-const withPWA = withPWAInit({
+const pwaPlugin = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
@@ -38,17 +39,13 @@ const withPWA = withPWAInit({
     document: "/offline",
   },
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/, /^ref$/],
-  /**
-   * Omit `additionalManifestEntries` so next-pwa keeps the default precache of everything
-   * under `public/` (icons, manifest.json, etc.) plus webpack-emitted assets.
-   */
   manifestTransforms: [
     async (manifestEntries: Array<{ url: string; revision?: string | null }>) => {
       const normalize = (u: string) => u.replace(/%5B/g, "[").replace(/%5D/g, "]").split("?")[0];
       const seen = new Set(manifestEntries.map((m) => normalize(m.url)));
       const extra: Array<{ url: string; revision: string }> = [];
-      for (const path of OFFLINE_SHELL_ROUTES) {
-        const url = path.startsWith("/") ? path : `/${path}`;
+      for (const route of OFFLINE_SHELL_ROUTES) {
+        const url = route.startsWith("/") ? route : `/${route}`;
         if (!seen.has(url)) {
           extra.push({ url, revision: APP_SHELL_REVISION });
           seen.add(url);
@@ -91,11 +88,56 @@ const withPWA = withPWAInit({
   ],
 });
 
-const nextConfig: NextConfig = {
+/**
+ * next-pwa only prepends `register.js` to the `main.js` webpack entry. Next.js App Router
+ * merges `main.js` into `main` and deletes `main.js`, so the register script never ships —
+ * no SW registration, empty Application → Service workers (exactly what you saw in DevTools).
+ * Inject into `main` / `main-app` after next-pwa runs.
+ */
+function injectPwaRegisterForAppRouter(config: { entry?: unknown }, options: { isServer?: boolean }) {
+  if (options.isServer) return;
+
+  const registerJs = path.join(path.dirname(require.resolve("next-pwa/package.json")), "register.js");
+  const prevEntry = config.entry;
+  if (!prevEntry) return;
+
+  config.entry = async () => {
+    const raw = typeof prevEntry === "function" ? await (prevEntry as () => Promise<Record<string, unknown>>)() : prevEntry;
+    if (!raw || typeof raw !== "object") return raw;
+
+    const entries = raw as Record<string, unknown>;
+    const hasRegister = (arr: unknown) =>
+      Array.isArray(arr) &&
+      (arr as string[]).some((p) => {
+        const s = String(p).replace(/\\/g, "/");
+        return s.includes("next-pwa") && s.includes("register");
+      });
+
+    for (const key of ["main", "main-app", "main.js"] as const) {
+      const v = entries[key];
+      if (Array.isArray(v) && v.length > 0 && !hasRegister(v)) {
+        (v as string[]).unshift(registerJs);
+        break;
+      }
+    }
+    return entries;
+  };
+}
+
+const baseConfig: NextConfig = {
   reactStrictMode: true,
   async redirects() {
     return [{ source: "/scope", destination: "/info", permanent: true }];
   },
 };
 
-export default withPWA(nextConfig);
+const withPWA = pwaPlugin(baseConfig);
+const origWebpack = withPWA.webpack;
+
+withPWA.webpack = (config, options) => {
+  const cfg = typeof origWebpack === "function" ? origWebpack(config, options) : config;
+  injectPwaRegisterForAppRouter(cfg, options);
+  return cfg;
+};
+
+export default withPWA;
