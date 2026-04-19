@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 import withPWAInit from "next-pwa";
 
+/** next-pwa default Workbox routes — includes same-origin `others` cache used by register.js on SPA nav. */
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pwaDefaultRuntimeCaching = require("next-pwa/cache") as Array<Record<string, unknown>>;
+
 /** Core screens users should be able to open after install, even offline. */
 const OFFLINE_SHELL_ROUTES = [
   "/",
@@ -13,7 +17,7 @@ const OFFLINE_SHELL_ROUTES = [
   "/workspace",
   "/offline",
 ];
-const APP_SHELL_REVISION = "app-shell-v2";
+const APP_SHELL_REVISION = "app-shell-v3";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -29,6 +33,10 @@ const withPWA = withPWAInit({
   },
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/, /^ref$/],
   additionalManifestEntries: OFFLINE_SHELL_ROUTES.map((url) => ({ url, revision: APP_SHELL_REVISION })),
+  /**
+   * next-pwa/register.js fills the `others` cache on client navigation (history.pushState).
+   * Do NOT replace default runtime rules with a different cache name for HTML (e.g. `app-pages`).
+   */
   runtimeCaching: [
     {
       urlPattern: ({ url }: { url: URL }) => url.origin === self.location.origin && url.pathname.startsWith("/_next/static/"),
@@ -43,34 +51,6 @@ const withPWA = withPWAInit({
       },
     },
     {
-      urlPattern: ({ url }: { url: URL }) => url.origin === self.location.origin && url.pathname.startsWith("/api/"),
-      handler: "NetworkFirst",
-      method: "GET",
-      options: {
-        cacheName: "same-origin-apis",
-        networkTimeoutSeconds: 3,
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 60 * 60 * 24,
-        },
-      },
-    },
-    {
-      urlPattern: ({ request, url }: { request: Request; url: URL }) =>
-        request.mode === "navigate" && url.origin === self.location.origin && !url.pathname.startsWith("/api/"),
-      handler: "StaleWhileRevalidate",
-      method: "GET",
-      options: {
-        cacheName: "app-pages",
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 60 * 60 * 24 * 30,
-        },
-      },
-    },
-    {
-      // Next.js App Router uses RSC/flight requests during client-side navigation.
-      // Cache these so module transitions still work when app is launched offline.
       urlPattern: ({ request, url }: { request: Request; url: URL }) => {
         if (url.origin !== self.location.origin || request.method !== "GET") return false;
         const hasRscParam = url.searchParams.has("_rsc") || url.searchParams.has("__nextDataReq");
@@ -87,35 +67,7 @@ const withPWA = withPWAInit({
         },
       },
     },
-    {
-      urlPattern: ({ request, url }: { request: Request; url: URL }) =>
-        request.destination === "script" ||
-        request.destination === "style" ||
-        request.destination === "worker" ||
-        (request.destination === "font" && url.origin === self.location.origin),
-      handler: "StaleWhileRevalidate",
-      method: "GET",
-      options: {
-        cacheName: "runtime-static-assets",
-        expiration: {
-          maxEntries: 128,
-          maxAgeSeconds: 60 * 60 * 24 * 14,
-        },
-      },
-    },
-    {
-      urlPattern: ({ request, url }: { request: Request; url: URL }) =>
-        request.destination === "image" && url.origin === self.location.origin,
-      handler: "StaleWhileRevalidate",
-      method: "GET",
-      options: {
-        cacheName: "runtime-images",
-        expiration: {
-          maxEntries: 128,
-          maxAgeSeconds: 60 * 60 * 24 * 7,
-        },
-      },
-    },
+    ...pwaDefaultRuntimeCaching,
   ],
 });
 

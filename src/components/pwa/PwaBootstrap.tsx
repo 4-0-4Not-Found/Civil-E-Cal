@@ -5,8 +5,8 @@ import { useEffect } from "react";
 const CORE_ROUTES = ["/", "/tension", "/compression", "/bending-shear", "/connections", "/report", "/info", "/workspace"];
 
 /**
- * Ensures service worker registration in production and warms
- * core route documents so installed app can reopen offline.
+ * After next-pwa registers the service worker, warm core route documents so
+ * the `others` cache (see register.js) is populated for cold offline opens.
  */
 export function PwaBootstrap() {
   useEffect(() => {
@@ -24,12 +24,11 @@ export function PwaBootstrap() {
           await fetch(path, {
             method: "GET",
             credentials: "same-origin",
-            cache: "reload",
             signal: ctrl.signal,
           });
           window.clearTimeout(timer);
         } catch {
-          // Ignore warm-up failures; app still works online.
+          /* ignore */
         }
       };
 
@@ -40,19 +39,18 @@ export function PwaBootstrap() {
       }
     };
 
-    const register = async () => {
+    const run = async () => {
       try {
-        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
         await navigator.serviceWorker.ready;
         if (!cancelled && navigator.onLine) {
           void warmCoreRoutes();
         }
       } catch {
-        // If registration fails, browser behaves as normal web app.
+        /* ignore */
       }
     };
 
-    void register();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -60,4 +58,3 @@ export function PwaBootstrap() {
 
   return null;
 }
-
