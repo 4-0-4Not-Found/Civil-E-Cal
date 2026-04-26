@@ -186,7 +186,6 @@ export default function ReportPage() {
   const tensionS = summaries?.tension ?? null;
   const compressionS = summaries?.compression ?? null;
   const bendingS = summaries?.bending ?? null;
-  const connectionsS = summaries?.connections ?? null;
 
   return (
     <AppShell>
@@ -208,7 +207,6 @@ export default function ReportPage() {
               { id: "report-tension", label: "Tension" },
               { id: "report-compression", label: "Compression" },
               { id: "report-beam", label: "Beam" },
-              { id: "report-connections", label: "Connections" },
             ]}
             navClassName="print:hidden"
           >
@@ -295,82 +293,6 @@ export default function ReportPage() {
                 </div>
               </details>
 
-              <details id="report-connections" open className="rounded-2xl border border-slate-200 bg-white print:break-inside-avoid">
-                <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
-                  Connections
-                  <span className="mt-1 block text-xs font-semibold text-slate-600">
-                    Saved snapshot from the Connections module.
-                  </span>
-                </summary>
-                <div className="border-t border-slate-200 p-5">
-                  {connectionsS?.ok && connectionsS.module === "connections" ? (
-                    <div className="space-y-3">
-                      <ul className="list-disc space-y-1 pl-5 text-sm">
-                      <li>
-                        Design: {connectionsS.designMethod ?? "—"} · Shear mode: {connectionsS.shearMode ?? "—"}
-                      </li>
-                      {connectionsS.phiRnShearGoverning !== undefined &&
-                      connectionsS.demandVu !== undefined &&
-                      connectionsS.shearSafe !== undefined ? (
-                        <li>
-                          Shear ({connectionsS.shearLabel ?? connectionsS.shearMode}): capacity / demand:{" "}
-                          {connectionsS.phiRnShearGoverning.toFixed(4)} / {connectionsS.demandVu.toFixed(4)} kips · Status:{" "}
-                          {connectionsS.shearSafe ? "SAFE" : "NOT SAFE"}
-                        </li>
-                      ) : (
-                        <li>Shear / slip: (insufficient saved inputs for a check)</li>
-                      )}
-                      {connectionsS.phiRnTension !== undefined &&
-                      connectionsS.demandTu !== undefined &&
-                      connectionsS.tensionSafe !== undefined ? (
-                        <li>
-                          Tension: capacity / demand: {connectionsS.phiRnTension.toFixed(4)} / {connectionsS.demandTu.toFixed(4)}{" "}
-                          kips · Status: {connectionsS.tensionSafe ? "SAFE" : "NOT SAFE"}
-                        </li>
-                      ) : null}
-                      {connectionsS.interactionSum !== undefined && connectionsS.interactionSafe !== undefined ? (
-                        <li>
-                          Shear–tension interaction (Σ): {connectionsS.interactionSum.toFixed(6)} · Status:{" "}
-                          {connectionsS.interactionSafe ? "SAFE" : "NOT SAFE"}
-                        </li>
-                      ) : null}
-                      {connectionsS.phiRnWeld !== undefined &&
-                      connectionsS.weldDemand !== undefined &&
-                      connectionsS.weldSafe !== undefined ? (
-                        <li>
-                          Fillet weld: capacity / demand: {connectionsS.phiRnWeld.toFixed(4)} / {connectionsS.weldDemand.toFixed(4)}{" "}
-                          kips · Status: {connectionsS.weldSafe ? "SAFE" : "NOT SAFE"}
-                        </li>
-                      ) : null}
-                      {connectionsS.phiRnGroove !== undefined &&
-                      connectionsS.grooveDemand !== undefined &&
-                      connectionsS.grooveSafe !== undefined ? (
-                        <li>
-                          Groove weld (shear on throat): capacity / demand: {connectionsS.phiRnGroove.toFixed(4)} /{" "}
-                          {connectionsS.grooveDemand.toFixed(4)} kips · Status: {connectionsS.grooveSafe ? "SAFE" : "NOT SAFE"}
-                        </li>
-                      ) : null}
-                      {connectionsS.pryingTMinApproxIn !== undefined && connectionsS.pryingTPerBoltUsed !== undefined ? (
-                        <li>
-                          Prying (approx. plate thickness): T/bolt = {connectionsS.pryingTPerBoltUsed.toFixed(4)} kips · t_min ≈{" "}
-                          {connectionsS.pryingTMinApproxIn.toFixed(4)} in (simplified strip model — see Connections module)
-                        </li>
-                      ) : null}
-                    </ul>
-                    {connectionsS.detailSteps && connectionsS.detailSteps.length > 0 ? (
-                      <CalculationStepsTable
-                        steps={connectionsS.detailSteps}
-                        title="Connections — detailed check (bolts, slip, fillet weld, optional groove & prying)"
-                      />
-                    ) : null}
-                    </div>
-                  ) : (
-                    <p className="text-slate-600">
-                      {connectionsS && "error" in connectionsS ? connectionsS.error : "No data."}
-                    </p>
-                  )}
-                </div>
-              </details>
             </>
           )}
           </PageSectionLayout>

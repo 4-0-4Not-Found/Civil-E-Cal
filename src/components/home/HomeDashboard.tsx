@@ -26,7 +26,7 @@ const modules: Array<{
     key: "tension",
     label: "Tension",
     href: "/tension",
-    summary: "Yielding, rupture, block shear; optional stagger helper.",
+    summary: "Yielding, rupture, block shear; optional Net Area Solver.",
     bullets: ["Quick SAFE / NOT SAFE", "Exports + step table"],
   },
   {
@@ -42,13 +42,6 @@ const modules: Array<{
     href: "/bending-shear",
     summary: "Flexure, shear, deflection; W + HSS check modes.",
     bullets: ["Load-to-M/V helper", "Utilization by limit state"],
-  },
-  {
-    key: "connections",
-    label: "Connections",
-    href: "/connections",
-    summary: "Bolts, slip-critical, tension, interaction, welds.",
-    bullets: ["Overall summary", "Design hints (n, weld size)"],
   },
 ];
 
@@ -119,6 +112,7 @@ function emptyModuleState(): Record<ModuleKey, { hasData: boolean; savedTs: numb
     tension: { hasData: false, savedTs: null },
     compression: { hasData: false, savedTs: null },
     bending: { hasData: false, savedTs: null },
+    // Legacy key retained for compatibility with old localStorage payloads.
     connections: { hasData: false, savedTs: null },
   };
 }
@@ -144,13 +138,6 @@ function previewLineFor(key: ModuleKey): string | null {
       const Mu = typeof p.Mu === "string" ? p.Mu : null;
       const Vu = typeof p.Vu === "string" ? p.Vu : null;
       return shape && Mu && Vu ? `${shape} · Mu ${Mu} · Vu ${Vu}` : shape ? String(shape) : null;
-    }
-    if (key === "connections") {
-      const vu = typeof p.vu === "string" ? p.vu : null;
-      const tu = typeof p.tu === "string" ? p.tu : null;
-      const n = typeof p.nBolts === "string" ? p.nBolts : null;
-      const d = typeof p.dBolt === "string" ? p.dBolt : null;
-      return vu && n && d ? `Vu ${vu} · Tu ${tu ?? "0"} · n=${n} d=${d} in` : vu ? `Vu ${vu}` : null;
     }
     return null;
   } catch {
@@ -284,7 +271,7 @@ export function HomeDashboard() {
           setRestoreOpen(false);
           try {
             Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));
-            ["tension", "compression", "bending", "connections"].forEach((m) => localStorage.removeItem(`ssc:ts:${m}`));
+            ["tension", "compression", "bending"].forEach((m) => localStorage.removeItem(`ssc:ts:${m}`));
             localStorage.removeItem("ssc:lastRoute");
           } catch {
             /* ignore */
@@ -397,7 +384,7 @@ export function HomeDashboard() {
             <p className="text-sm text-slate-700">Pick a calculator. Your inputs are saved locally as you work.</p>
           </div>
           <p className="text-xs font-semibold text-slate-600">
-            Suggested order: Tension → Compression → Beam → Connections
+            Suggested order: Tension &gt; Compression &gt; Beam
           </p>
         </div>
 
@@ -523,7 +510,7 @@ export function HomeDashboard() {
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-600">
                   <span>{s?.hasData ? (saved ? `Last saved: ${saved}` : "Saved inputs found") : "No saved inputs yet"}</span>
-                  <span className="text-[color:var(--brand)]">Open →</span>
+                  <span className="text-[color:var(--brand)]">Open</span>
                 </div>
               </a>
             );

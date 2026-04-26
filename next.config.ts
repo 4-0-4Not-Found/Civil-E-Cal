@@ -23,7 +23,7 @@ const OFFLINE_SHELL_ROUTES = [
   "/workspace",
 ];
 
-const APP_SHELL_REVISION = "app-shell-v6";
+const APP_SHELL_REVISION = "app-shell-v8";
 
 function normalizeManifestPath(url: string): string {
   try {

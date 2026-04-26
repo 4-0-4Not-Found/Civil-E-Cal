@@ -13,7 +13,6 @@ const modules: Array<{ key: ModuleKey; label: string; href: string }> = [
   { key: "tension", label: "Tension", href: "/tension" },
   { key: "compression", label: "Compression", href: "/compression" },
   { key: "bending", label: "Beam", href: "/bending-shear" },
-  { key: "connections", label: "Connections", href: "/connections" },
 ];
 
 export function ModuleProgressPanel() {

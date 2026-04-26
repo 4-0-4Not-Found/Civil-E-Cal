@@ -5,7 +5,6 @@ import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import {
   asdStrengthUniformLoadKlf,
   lrfdFactoredUniformLoadKlf,
-  serviceUniformLoadKlf,
 } from "@/lib/excel-parity";
 import { fmtKipFt, fmtKips } from "@/lib/format/display";
 import { flangeWebSlenderness } from "@/lib/calculations/section-slenderness";
@@ -23,6 +22,8 @@ import { UtilizationBar } from "@/components/ui/UtilizationBar";
 import { TextInputWithUnit } from "@/components/ui/InputGroup";
 import { CalculatorActionRail } from "@/components/actions/CalculatorActionRail";
 import { PageSectionNav } from "@/components/navigation/PageSectionNav";
+
+const editableInputClass = "border-sky-300 bg-sky-50 focus:border-sky-400 focus:ring-sky-500/10";
 
 export default function BendingShearPage() {
   const [designMethod, setDesignMethod] = useState<"LRFD" | "ASD">("LRFD");
@@ -159,7 +160,7 @@ export default function BendingShearPage() {
     const MuDer = (wStrengthKlf * Lft * Lft) / 8;
     const VuDer = (wStrengthKlf * Lft) / 2;
     /** Service load for deflection: D + L (unfactored) → kip/in. */
-    const wServiceKipIn = serviceUniformLoadKlf(DL, LL) / 12;
+    const wServiceKipIn = LL / 12;
     const Lin = Lft * 12;
     return { wStrengthKlf, MuDer, VuDer, wServiceKipIn, Lin };
   }, [deadLoadKft, liveLoadKft, spanFt, designMethod]);
@@ -309,6 +310,14 @@ export default function BendingShearPage() {
           description="Simply supported strong axis: rolled W-shapes (full F6/F2) or rectangular HSS (approximate F7/G-style limits in-engine). Design mode suggests lightest W only. Inputs save in this browser."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
+          <div className="md:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-slate-950">Quick workflow</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+              <li>Pick steel/member and method in General.</li>
+              <li>Enter dead/live/span first so Mu, Vu, L, and service load auto-populate correctly.</li>
+              <li>Adjust only blue fields in Member checks, then review utilization and Steps.</li>
+            </ol>
+          </div>
           <div className="md:col-span-12 md:hidden">
             <PageSectionNav
               sections={[
@@ -398,12 +407,12 @@ export default function BendingShearPage() {
                     <div>
                       <p className="font-semibold">{slenderness.flange.label}</p>
                       <p>λ = {slenderness.flange.lambda.toFixed(2)}, λ_p = {slenderness.flange.lambdaP.toFixed(3)}, λ_r = {slenderness.flange.lambdaR.toFixed(3)}</p>
-                      <p className="text-slate-900">→ {slenderness.flange.class}</p>
+                      <p className="text-slate-900">Class: {slenderness.flange.class}</p>
                     </div>
                     <div>
                       <p className="font-semibold">{slenderness.web.label}</p>
                       <p>λ = {slenderness.web.lambda.toFixed(2)}, λ_p = {slenderness.web.lambdaP.toFixed(3)}, λ_r = {slenderness.web.lambdaR.toFixed(3)}</p>
-                      <p className="text-slate-900">→ {slenderness.web.class}</p>
+                      <p className="text-slate-900">Class: {slenderness.web.class}</p>
                     </div>
                   </div>
                 </CardBody>
@@ -414,7 +423,7 @@ export default function BendingShearPage() {
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
                 2 · Loads
                 <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  Option A: dead/live/span → auto-derive M, V, service w. Option B: enter M, V, w manually.
+                  Enter dead/live/span to auto-calculate M, V, L, and service w.
                 </span>
                 <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   Units: k/ft, ft
@@ -423,10 +432,10 @@ export default function BendingShearPage() {
               <div className="border-t border-slate-200 p-5">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Dead load w_D" hint="Uniform dead load (kips per ft).">
-                    <TextInputWithUnit value={deadLoadKft} onChange={setDeadLoadKft} unit="k/ft" placeholder="e.g. 0.8" inputMode="decimal" />
+                    <TextInputWithUnit value={deadLoadKft} onChange={setDeadLoadKft} unit="k/ft" placeholder="e.g. 0.8" inputMode="decimal" className={editableInputClass} />
                   </Field>
                   <Field label="Live load w_L" hint="Uniform live load (kips per ft).">
-                    <TextInputWithUnit value={liveLoadKft} onChange={setLiveLoadKft} unit="k/ft" placeholder="e.g. 3.2" inputMode="decimal" />
+                    <TextInputWithUnit value={liveLoadKft} onChange={setLiveLoadKft} unit="k/ft" placeholder="e.g. 3.2" inputMode="decimal" className={editableInputClass} />
                   </Field>
                   <Field label="Span" hint="Feet (converts to L in inches).">
                     <TextInputWithUnit
@@ -438,6 +447,7 @@ export default function BendingShearPage() {
                       }}
                       unit="ft"
                       placeholder="e.g. 30"
+                      className={editableInputClass}
                     />
                   </Field>
                 </div>
@@ -453,7 +463,7 @@ export default function BendingShearPage() {
                       <p className="tabular-nums">
                         M_u = {derivedFromLoads.MuDer.toFixed(3)} kip·ft · V_u = {derivedFromLoads.VuDer.toFixed(3)} kips
                       </p>
-                      <p className="tabular-nums">Service w for deflection (D+L) = {derivedFromLoads.wServiceKipIn.toFixed(4)} kip/in</p>
+                      <p className="tabular-nums">Service w for deflection (L/12) = {derivedFromLoads.wServiceKipIn.toFixed(4)} kip/in</p>
                     </CardBody>
                   </Card>
                 ) : null}
@@ -464,7 +474,7 @@ export default function BendingShearPage() {
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
                 3 · Member checks (M, V, LTB, deflection)
                 <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  Enter demands directly (or use Loads above). L is inches for analysis.
+                  Only blue fields are editable. Non-blue values are auto-calculated from blue inputs.
                 </span>
                 <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   Units: kip·ft, kips, in
@@ -472,33 +482,36 @@ export default function BendingShearPage() {
               </summary>
               <div className="border-t border-slate-200 p-5">
                 <div className="grid gap-4 md:grid-cols-2">
-                <Field label="M_u" hint="Required flexural strength (kip·ft). Filled automatically when dead/live/span are set.">
-                  <TextInputWithUnit value={Mu} onChange={setMu} unit="kip·ft" inputMode="decimal" />
+                <Field label="M_u" hint="Required flexural strength (kip·ft). Auto-calculated from dead/live/span.">
+                  <TextInputWithUnit value={Mu} onChange={setMu} unit="kip·ft" inputMode="decimal" disabled />
                 </Field>
                 <Field label="V_u" hint="Required shear (kips).">
-                  <TextInputWithUnit value={Vu} onChange={setVu} unit="kips" inputMode="decimal" />
+                  <TextInputWithUnit value={Vu} onChange={setVu} unit="kips" inputMode="decimal" disabled />
                 </Field>
                 <Field label="Span L" hint="Span in inches." error={invalid(L, 0) ? "Enter a number ≥ 0." : undefined}>
-                  <TextInputWithUnit value={L} onChange={setL} unit="in" inputMode="decimal" />
+                  <TextInputWithUnit value={L} onChange={setL} unit="in" inputMode="decimal" disabled />
                 </Field>
                 <Field
                   label="Unbraced L_b (LTB)"
                   hint="Inches along the beam between points braced against twist/lateral displacement. Leave blank to use span L (fully unbraced)."
                   error={invalid(unbracedLbIn, 0, true) ? "Enter a number ≥ 0, or leave blank." : undefined}
                 >
-                  <TextInputWithUnit value={unbracedLbIn} onChange={setUnbracedLbIn} unit="in" placeholder="default = span" inputMode="decimal" />
+                  <TextInputWithUnit value={unbracedLbIn} onChange={setUnbracedLbIn} unit="in" placeholder="default = span" inputMode="decimal" className={editableInputClass} />
                 </Field>
                 <Field
                   label="C_b (moment gradient)"
                   hint="AISC F1. Uniform moment 1.0; uniform load on simple span ≈ 1.14; others per Table 3-2."
                   error={invalid(cbFactor, 0) ? "Enter a number > 0." : undefined}
                 >
-                  <TextInput value={cbFactor} onChange={setCbFactor} />
+                  <TextInput value={cbFactor} onChange={setCbFactor} className={editableInputClass} inputMode="decimal" />
                 </Field>
-                <Field label="Service w for deflection" hint="Uniform service load in kip/in — with D/L/span above, uses (D+L)/12; manual mode: enter (D+L)/12 or your Excel convention.">
-                  <TextInputWithUnit value={wLive} onChange={setWLive} unit="kip/in" inputMode="decimal" />
+                <Field label="Service w for deflection" hint="Uniform service load in kip/in — auto-calculated from live load (L/12).">
+                  <TextInputWithUnit value={wLive} onChange={setWLive} unit="kip/in" inputMode="decimal" disabled />
                 </Field>
                 </div>
+                <p className="mt-3 text-xs font-semibold text-slate-600">
+                  Blue fields are user-editable. Non-blue fields are auto-calculated and locked.
+                </p>
               </div>
             </details>
 
@@ -664,7 +677,7 @@ export default function BendingShearPage() {
                       <LimitRow
                         title={
                           deadLoadKft.trim() && liveLoadKft.trim() && spanFt.trim()
-                            ? "Deflection (service D+L)"
+                            ? "Deflection (service L only)"
                             : "Deflection (service w)"
                         }
                         demand={out.beamLimitStates.deflection.demand}
@@ -794,3 +807,12 @@ function LimitRow(props: {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

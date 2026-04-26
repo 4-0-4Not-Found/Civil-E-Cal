@@ -32,8 +32,8 @@ export default function InfoPage() {
             <div className="border-t border-slate-200 p-5">
               <ul className="list-disc space-y-2 pl-5 text-sm">
               <li>
-                <strong>Tension:</strong> Gross yielding, net-section rupture, block shear (J4.3), optional staggered net-width
-                helper (D3). Check mode or design hint (lightest shape in a chosen family by weight).
+                <strong>Tension:</strong> Gross yielding, net-section rupture, block shear (J4.3), optional Net Area Solver
+                for staggered net-width (D3). Check mode or design hint (lightest shape in a chosen family by weight).
               </li>
               <li>
                 <strong>Compression:</strong> Member flexural buckling (E3), controlling KL/r, LRFD or ASD. Optional multiplier on{" "}
@@ -45,11 +45,6 @@ export default function InfoPage() {
                 <strong> Design mode</strong> searches rolled <strong>W</strong> shapes. <strong>Check mode</strong> can use{" "}
                 <strong>W</strong> or <strong>HSS</strong> with simplified HSS assumptions (wall slenderness, shear area).
                 Optional dead/live/span to build loads, or enter M, V, and w yourself.
-              </li>
-              <li>
-                <strong>Connections:</strong> Bolt shear and bearing (J3.10 — hole-edge limit), slip-critical slip (J3.8), bolt
-                tension, shear–tension interaction, fillet and groove weld metal in shear, approximate prying plate thickness —
-                plus bolt-count and weld-length hints. Inputs can auto-save in your browser.
               </li>
               </ul>
             </div>
@@ -97,7 +92,7 @@ export default function InfoPage() {
               <li>
                 <strong>LRFD</strong> is the default; switch to <strong>ASD</strong> where offered. Beam auto-loads from D+L use
                 LRFD factored w for strength when LRFD is selected, and D+L for ASD strength when ASD is selected; service{" "}
-                <strong>D+L</strong> is used for deflection checks.
+                <strong>L only</strong> is used for deflection checks.
               </li>
               <li>Final strengths and demands are usually shown to <strong>about three decimal places</strong> for readability.</li>
               </ul>

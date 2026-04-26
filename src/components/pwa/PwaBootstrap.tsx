@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const CORE_ROUTES = ["/", "/tension", "/compression", "/bending-shear", "/connections", "/report", "/info", "/workspace"];
+const CORE_ROUTES = ["/", "/tension", "/compression", "/bending-shear", "/report", "/info", "/workspace"];
 
 /**
  * After next-pwa registers the service worker, warm core route documents so

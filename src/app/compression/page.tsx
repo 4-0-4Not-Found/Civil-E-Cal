@@ -32,6 +32,10 @@ export default function CompressionPage() {
   const [L, setL] = useState("240");
   const [Pu, setPu] = useState("700");
   const [designMethod, setDesignMethod] = useState<"LRFD" | "ASD">("LRFD");
+  const [mode, setMode] = useState<"check" | "design">("check");
+  const [designMinAg, setDesignMinAg] = useState("");
+  const [designMinR, setDesignMinR] = useState("");
+  const [useDesignFilters, setUseDesignFilters] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -54,6 +58,10 @@ export default function CompressionPage() {
         if (typeof p.L === "string") setL(p.L);
         if (typeof p.Pu === "string") setPu(p.Pu);
         if (p.designMethod === "LRFD" || p.designMethod === "ASD") setDesignMethod(p.designMethod);
+        if (p.mode === "check" || p.mode === "design") setMode(p.mode);
+        if (typeof p.designMinAg === "string") setDesignMinAg(p.designMinAg);
+        if (typeof p.designMinR === "string") setDesignMinR(p.designMinR);
+        if (p.useDesignFilters === "yes" || p.useDesignFilters === "no") setUseDesignFilters(p.useDesignFilters === "yes");
       });
     } catch {
       /* ignore */
@@ -67,7 +75,20 @@ export default function CompressionPage() {
       setSaving(true);
       localStorage.setItem(
         STORAGE.compression,
-        JSON.stringify({ material, shapeFamily, shapeName, k, builtUpFactor, L, Pu, designMethod }),
+        JSON.stringify({
+          material,
+          shapeFamily,
+          shapeName,
+          k,
+          builtUpFactor,
+          L,
+          Pu,
+          designMethod,
+          mode,
+          designMinAg,
+          designMinR,
+          useDesignFilters: useDesignFilters ? "yes" : "no",
+        }),
       );
       const ts = Date.now();
       localStorage.setItem("ssc:ts:compression", String(ts));
@@ -77,7 +98,7 @@ export default function CompressionPage() {
     }
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => setSaving(false), 450);
-  }, [hydrated, material, shapeFamily, shapeName, k, builtUpFactor, L, Pu, designMethod]);
+  }, [hydrated, material, shapeFamily, shapeName, k, builtUpFactor, L, Pu, designMethod, mode, designMinAg, designMinR, useDesignFilters]);
 
   const shapeChoices = useMemo(
     () => filterShapesByFamily(aiscShapes, shapeFamily, "compression"),
@@ -96,6 +117,12 @@ export default function CompressionPage() {
   };
 
   const kEffective = Number(k) * (Number.isFinite(Number(builtUpFactor)) && Number(builtUpFactor) > 0 ? Number(builtUpFactor) : 1);
+  const minAgFilter = Number(designMinAg) || 0;
+  const minRFilter = Number(designMinR) || 0;
+  const designPool = useMemo(() => {
+    if (!useDesignFilters) return shapeChoices;
+    return shapeChoices.filter((s) => s.A >= minAgFilter && Math.min(s.rx, s.ry) >= minRFilter);
+  }, [shapeChoices, useDesignFilters, minAgFilter, minRFilter]);
 
   const out = useMemo(
     () =>
@@ -117,6 +144,32 @@ export default function CompressionPage() {
 
   const missingSlenderness = shape ? shape.bf_2tf <= 0 && shape.h_tw <= 0 : false;
 
+  const designRows = useMemo(() => {
+    if (mode !== "design") return [];
+    return [...designPool]
+      .sort((a, b) => a.W - b.W)
+      .slice(0, 24)
+      .map((s) => {
+        const r = calculateCompressionDesign({
+          designMethod,
+          Fy: mat.Fy,
+          E: 29000,
+          k: kEffective,
+          L: Number(L),
+          rx: s.rx,
+          ry: s.ry,
+          Ag: s.A,
+          lambdaFlange: s.bf_2tf,
+          lambdaWeb: s.h_tw,
+          demandPu: Number(Pu),
+        });
+        return { shape: s.shape, W: s.W, strength: r.controllingStrength, safe: r.isSafe, gov: r.governingCase };
+      });
+  }, [mode, designPool, designMethod, mat.Fy, kEffective, L, Pu]);
+  const designSuggestion = useMemo(() => designRows.find((r) => r.safe) ?? null, [designRows]);
+  const safeDesignRows = useMemo(() => designRows.filter((r) => r.safe), [designRows]);
+  const unsafeDesignRows = useMemo(() => designRows.filter((r) => !r.safe), [designRows]);
+
   const csvRows = useMemo(() => {
     return [
       ["Field", "Value"],
@@ -124,10 +177,11 @@ export default function CompressionPage() {
       ["Shape family", shapeFamily],
       ["Shape", shapeName],
       ["Design method", designMethod],
+      ["Mode", mode],
       ["Pu / Pa (kips)", Pu],
       ["Strength (kips)", out.controllingStrength.toFixed(3)],
     ];
-  }, [material, shapeFamily, shapeName, Pu, designMethod, out.controllingStrength]);
+  }, [material, shapeFamily, shapeName, Pu, designMethod, mode, out.controllingStrength]);
 
   function scrollTo(id: string) {
     try {
@@ -153,6 +207,10 @@ export default function CompressionPage() {
     setL("240");
     setPu("700");
     setDesignMethod("LRFD");
+    setMode("check");
+    setDesignMinAg("");
+    setDesignMinR("");
+    setUseDesignFilters(false);
   };
 
   const invalid = (v: string, min = 0) => {
@@ -168,6 +226,14 @@ export default function CompressionPage() {
           description="Column buckling (E3), LRFD or ASD. Slender-element limits are approximate when shape data is available. Inputs save in this browser."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
+          <div className="md:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-slate-950">Quick workflow</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+              <li>Choose steel, shape family, shape, and check/design mode in General.</li>
+              <li>Enter demand and member data in KL/r section (L, K, and optional built-up factor).</li>
+              <li>Review governing case, result panel, and Steps before exporting.</li>
+            </ol>
+          </div>
           <div className="md:col-span-12 md:hidden">
             <PageSectionNav
               sections={[
@@ -191,7 +257,9 @@ export default function CompressionPage() {
             <details open className="rounded-2xl border border-slate-200 bg-white" id="compression-general">
               <summary className="min-h-11 cursor-pointer px-4 py-3.5 text-sm font-extrabold tracking-tight text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 sm:px-5 sm:py-4">
                 1 · General
-                <span className="mt-1 block text-xs font-semibold text-slate-600">Steel + section selection.</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-600">
+                  Blue fields are user input. Non-blue values below are auto-computed from your inputs.
+                </span>
                 <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   Units: ksi, in
                 </span>
@@ -225,6 +293,30 @@ export default function CompressionPage() {
                       ))}
                     </SelectInput>
                   </Field>
+                  <Field label="Mode" hint="Check selected shape or search lightest safe shape.">
+                    <SelectInput value={mode} onChange={(v) => setMode(v as "check" | "design")}>
+                      <option value="check">Check / analyze</option>
+                      <option value="design">Design (lightest shape)</option>
+                    </SelectInput>
+                  </Field>
+                  {mode === "design" ? (
+                    <Field label="Apply design filters?" hint="Optional min Ag and min r requirements.">
+                      <SelectInput value={useDesignFilters ? "yes" : "no"} onChange={(v) => setUseDesignFilters(v === "yes")}>
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                      </SelectInput>
+                    </Field>
+                  ) : null}
+                  {mode === "design" && useDesignFilters ? (
+                    <>
+                      <Field label="Min Ag" hint="in²">
+                        <TextInputWithUnit value={designMinAg} onChange={setDesignMinAg} unit="in²" inputMode="decimal" />
+                      </Field>
+                      <Field label="Min r" hint="in (uses min(rx, ry))">
+                        <TextInputWithUnit value={designMinR} onChange={setDesignMinR} unit="in" inputMode="decimal" />
+                      </Field>
+                    </>
+                  ) : null}
                 </div>
 
                 {shape ? (
@@ -247,7 +339,9 @@ export default function CompressionPage() {
             <details open className="rounded-2xl border border-slate-200 bg-white" id="compression-member">
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
                 2 · Member (KL/r)
-                <span className="mt-1 block text-xs font-semibold text-slate-600">Method, demand, length, and K.</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-600">
+                  Enter demand and member inputs in blue; capacity and governing checks update automatically.
+                </span>
                 <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   Units: kips, in
                 </span>
@@ -301,6 +395,61 @@ export default function CompressionPage() {
                 </div>
               </div>
             </details>
+
+            {mode === "design" && designSuggestion ? (
+              <Card className="border-[color:var(--brand)]/20 bg-[color:var(--brand)]/5">
+                <CardBody>
+                  <p className="text-sm font-semibold text-slate-900">Suggested section (lightest safe)</p>
+                  <p className="mt-1 text-xl font-extrabold tracking-tight text-slate-950">{designSuggestion.shape}</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {designSuggestion.W.toFixed(1)} lb/ft · Strength {designSuggestion.strength.toFixed(3)} kips
+                  </p>
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {mode === "design" && designRows.length > 0 ? (
+              <Card className="border border-slate-200 shadow-none">
+                <CardBody className="space-y-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Section comparison (lightest first){useDesignFilters ? " · filters applied" : ""}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-600">
+                    SAFE: {safeDesignRows.length} · NOT SAFE: {unsafeDesignRows.length}
+                  </p>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[28rem] text-left text-sm text-slate-800">
+                      <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+                        <tr>
+                          <th className="px-3 py-2">Shape</th>
+                          <th className="px-3 py-2">W (plf)</th>
+                          <th className="px-3 py-2">Governing</th>
+                          <th className="px-3 py-2">Strength</th>
+                          <th className="px-3 py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {designRows.map((row) => (
+                          <tr key={row.shape} className="border-t border-slate-200">
+                            <td className="px-3 py-2 font-medium">{row.shape}</td>
+                            <td className="px-3 py-2">{row.W.toFixed(1)}</td>
+                            <td className="px-3 py-2">{row.gov}</td>
+                            <td className="px-3 py-2">{row.strength.toFixed(3)} kips</td>
+                            <td className="px-3 py-2">
+                              {row.safe ? (
+                                <span className="font-semibold text-emerald-800">SAFE</span>
+                              ) : (
+                                <span className="font-semibold text-rose-800">NOT SAFE</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardBody>
+              </Card>
+            ) : null}
 
             <details id="compression-steps" className="rounded-2xl border border-slate-200 bg-white">
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">

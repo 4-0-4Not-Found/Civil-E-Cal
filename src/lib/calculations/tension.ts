@@ -18,11 +18,11 @@ export type TensionInput = {
 };
 
 const PHI_YIELD = 0.9;
-const PHI_FRACTURE = 0.75;
+const PHI_RUPTURE = 0.75;
 const PHI_BLOCK = 0.75;
 /** ASD safety factors — AISC D2 (yield, rupture), J4.3 block shear. */
 const OMEGA_YIELD = 1.67;
-const OMEGA_FRACTURE = 2.0;
+const OMEGA_RUPTURE = 2.0;
 const OMEGA_BLOCK = 2.0;
 
 /**
@@ -38,7 +38,7 @@ export function calculateTensionDesign(input: TensionInput): CalculationOutput {
   const Ant = input.Ant ?? 0;
 
   const rnYield = Fy * Ag;
-  const rnFracture = Fu * Ae;
+  const rnRupture = Fu * Ae;
   const Ubs = input.ubs ?? 0.5;
 
   const rnShearRuptureTensionRupture = 0.6 * Fu * Anv + Ubs * Fu * Ant;
@@ -65,14 +65,14 @@ export function calculateTensionDesign(input: TensionInput): CalculationOutput {
 
   const strengthYield =
     method === "LRFD" ? PHI_YIELD * rnYield : rnYield / OMEGA_YIELD;
-  const strengthFracture =
-    method === "LRFD" ? PHI_FRACTURE * rnFracture : rnFracture / OMEGA_FRACTURE;
+  const strengthRupture =
+    method === "LRFD" ? PHI_RUPTURE * rnRupture : rnRupture / OMEGA_RUPTURE;
   const strengthBlock =
     hasNetAreas && Number.isFinite(rnBlock) ? (method === "LRFD" ? PHI_BLOCK * rnBlock : rnBlock / OMEGA_BLOCK) : Number.POSITIVE_INFINITY;
 
   const results: Record<string, CalculationResult> = {
     grossYielding: { name: "Gross Section Yielding", phiPn: strengthYield, unit: "kips" },
-    netFracture: { name: "Net Section Fracture", phiPn: strengthFracture, unit: "kips" },
+    netFracture: { name: "Net Section Rupture", phiPn: strengthRupture, unit: "kips" },
     blockShear: { name: "Block Shear", phiPn: strengthBlock, unit: "kips" },
   };
 
@@ -138,9 +138,9 @@ export function calculateTensionDesign(input: TensionInput): CalculationOutput {
     },
     {
       id: "s3",
-      label: method === "LRFD" ? "Fracture strength" : "Fracture allowable",
+      label: method === "LRFD" ? "Rupture strength" : "Rupture allowable",
       formula: method === "LRFD" ? "phi P_n = 0.75 F_u A_e" : "F_u A_e / 2.00",
-      value: strengthFracture,
+      value: strengthRupture,
       unit: "kips",
     },
     ...blockSteps,
@@ -162,3 +162,5 @@ export function calculateTensionDesign(input: TensionInput): CalculationOutput {
     isSafe: controllingStrength >= demandPu,
   };
 }
+
+

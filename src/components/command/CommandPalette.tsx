@@ -97,7 +97,6 @@ export function CommandPalette() {
       { href: "/tension", label: "Tension" },
       { href: "/compression", label: "Compression" },
       { href: "/bending-shear", label: "Beam" },
-      { href: "/connections", label: "Connections" },
       { href: "/report", label: "Report" },
       { href: "/info", label: "Info" },
     ];

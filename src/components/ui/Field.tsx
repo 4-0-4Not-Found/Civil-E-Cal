@@ -34,18 +34,24 @@ export function TextInput(props: {
   onChange: (value: string) => void;
   placeholder?: string;
   clearable?: boolean;
+  className?: string;
+  disabled?: boolean;
+  inputMode?: "none" | "text" | "tel" | "url" | "email" | "numeric" | "decimal" | "search";
 }) {
-  const canClear = (props.clearable ?? true) && props.value.length > 0;
+  const canClear = (props.clearable ?? true) && props.value.length > 0 && !props.disabled;
   return (
     <div className="relative">
       <input
         className={cn(
-          "w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10",
+          "w-full min-h-11 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400 focus-visible:ring-4 focus-visible:ring-sky-500/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500",
           canClear ? "pr-10" : null,
+          props.className,
         )}
         value={props.value}
         placeholder={props.placeholder}
         onChange={(e) => props.onChange(e.target.value)}
+        disabled={props.disabled}
+        inputMode={props.inputMode}
       />
       {canClear ? (
         <button
@@ -65,15 +71,20 @@ export function SelectInput(props: {
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
+  className?: string;
+  disabled?: boolean;
 }) {
   return (
     <select
-      className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-black shadow-sm outline-none focus:border-[color:var(--brand)]/40 focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10"
+      className={cn(
+        "w-full min-h-11 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2.5 text-sm font-semibold text-black shadow-sm outline-none focus:border-sky-400 focus-visible:ring-4 focus-visible:ring-sky-500/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500",
+        props.className,
+      )}
       value={props.value}
+      disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value)}
     >
       {props.children}
     </select>
   );
 }
-
