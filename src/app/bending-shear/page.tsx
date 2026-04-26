@@ -176,6 +176,7 @@ export default function BendingShearPage() {
   }, [derivedFromLoads]);
 
   const out = useMemo(() => {
+    if (mode !== "check") return null;
     if (!shape) return null;
     const Lin = derivedFromLoads?.Lin ?? Number(L);
     const w = derivedFromLoads?.wServiceKipIn ?? Number(wLive);
@@ -212,7 +213,7 @@ export default function BendingShearPage() {
       deflectionAllowable: Lin / 360,
       Lb: LbUse,
       Cb: CbUse,
-      sectionProfile: mode === "design" ? "W" : shape.type === "HSS" ? "HSS" : "W",
+      sectionProfile: shape.type === "HSS" ? "HSS" : "W",
     });
   }, [shape, mat, Mu, Vu, L, wLive, designMethod, derivedFromLoads, unbracedLbIn, cbFactor, mode]);
 
@@ -301,32 +302,39 @@ export default function BendingShearPage() {
     const n = Number(v);
     return !Number.isFinite(n) || n < min;
   };
+  const sectionNavItems =
+    mode === "check"
+      ? [
+          { id: "beam-general", label: "General" },
+          { id: "beam-loads", label: "Loads" },
+          { id: "beam-check", label: "Checks" },
+          { id: "beam-steps", label: "Steps" },
+        ]
+      : [
+          { id: "beam-general", label: "General" },
+          { id: "beam-loads", label: "Loads" },
+          { id: "beam-design-result", label: "Design" },
+        ];
+  const resultAnchorId = mode === "design" ? "beam-design-result" : "results";
 
   return (
     <AppShell>
       <Card>
         <CardHeader
           title="Bending, Shear & Deflection"
-          description="Simply supported strong axis: rolled W-shapes (full F6/F2) or rectangular HSS (approximate F7/G-style limits in-engine). Design mode suggests lightest W only. Inputs save in this browser."
+          description="Analysis and design are separated: Analysis checks a chosen section (W/HSS), while Design searches for a lightest W-shape that passes."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-bold text-slate-950">Quick workflow</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
-              <li>Pick steel/member and method in General.</li>
-              <li>Enter dead/live/span first so Mu, Vu, L, and service load auto-populate correctly.</li>
-              <li>Adjust only blue fields in Member checks, then review utilization and Steps.</li>
+              <li>Choose mode first: Analysis (section check) or Design (auto-search W-shape).</li>
+              <li>Enter dead/live/span so Mu, Vu, L, and service deflection load auto-populate.</li>
+              <li>For Analysis, review checks and steps. For Design, review the suggested W-shape.</li>
             </ol>
           </div>
           <div className="md:col-span-12 md:hidden">
-            <PageSectionNav
-              sections={[
-                { id: "beam-general", label: "General" },
-                { id: "beam-loads", label: "Loads" },
-                { id: "beam-check", label: "Checks" },
-                { id: "beam-steps", label: "Steps" },
-              ]}
-            />
+            <PageSectionNav sections={sectionNavItems} />
           </div>
           <div className="md:col-span-8 grid gap-4">
             <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-general">
@@ -350,25 +358,34 @@ export default function BendingShearPage() {
                       ))}
                     </SelectInput>
                   </Field>
-                  <Field
-                    label={mode === "design" ? "W-shape (design)" : "Member (W or HSS)"}
-                    hint="AISC v16. HSS uses simplified assumptions; verify critical members with AISC F7."
-                  >
-                    <SelectInput value={shapeName} onChange={setShapeName}>
-                      {shapeOptions.map((s) => (
-                        <option key={s.shape} value={s.shape}>
-                          {s.shape}
-                        </option>
-                      ))}
-                    </SelectInput>
-                  </Field>
+                  {mode === "check" ? (
+                    <Field
+                      label="Member (W or HSS)"
+                      hint="AISC v16. HSS uses simplified assumptions; verify critical members with AISC F7."
+                    >
+                      <SelectInput value={shapeName} onChange={setShapeName}>
+                        {shapeOptions.map((s) => (
+                          <option key={s.shape} value={s.shape}>
+                            {s.shape}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    </Field>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                      <p className="font-semibold text-slate-900">Design mode (W-search)</p>
+                      <p className="mt-1">
+                        Member selection is disabled here. The tool automatically searches W-shapes and returns the lightest safe option.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <Field label="Mode" hint="Check a chosen section, or suggest a lighter W that works.">
+                  <Field label="Mode" hint="Analysis is separate from design search, per client worksheet flow.">
                     <SelectInput value={mode} onChange={(v) => setMode(v as "check" | "design")}>
-                      <option value="check">Check section</option>
-                      <option value="design">Suggest lightest W</option>
+                      <option value="check">Analysis (check selected section)</option>
+                      <option value="design">Design (find lightest W-shape)</option>
                     </SelectInput>
                   </Field>
                   <Field label="Design method" hint="LRFD or ASD strength reduction.">
@@ -379,7 +396,7 @@ export default function BendingShearPage() {
                   </Field>
                 </div>
 
-                {shape ? (
+                {mode === "check" && shape ? (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-semibold text-slate-900">Section context</p>
@@ -396,7 +413,7 @@ export default function BendingShearPage() {
               </div>
             </details>
 
-            {slenderness ? (
+            {mode === "check" && slenderness ? (
               <Card className="shadow-none border border-slate-200 bg-white">
                 <CardBody className="space-y-3 text-sm text-slate-800">
                   <p className="text-base font-semibold text-slate-900">Local buckling (AISC Table B4.1)</p>
@@ -470,6 +487,7 @@ export default function BendingShearPage() {
               </div>
             </details>
 
+            {mode === "check" ? (
             <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-check">
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
                 3 · Member checks (M, V, LTB, deflection)
@@ -514,20 +532,31 @@ export default function BendingShearPage() {
                 </p>
               </div>
             </details>
-
-            {suggestion ? (
-              <Card className="border-slate-300 bg-white">
-                <CardBody>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Suggested section (lowest weight W that passes)</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{suggestion.s.shape}</p>
-                  <p className="mt-1 text-base font-medium text-slate-800">
-                    {suggestion.s.W} lb/ft, Zx = {suggestion.s.Zx.toFixed(1)} in³
-                  </p>
-                </CardBody>
-              </Card>
             ) : null}
 
-            {out ? (
+            {mode === "design" ? (
+              <div id="beam-design-result">
+              <Card className="border-slate-300 bg-white">
+                <CardBody>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Design of Beam (W-shape search)</p>
+                  {suggestion ? (
+                    <>
+                      <p className="mt-1 text-2xl font-bold text-slate-900">{suggestion.s.shape}</p>
+                      <p className="mt-1 text-base font-medium text-slate-800">
+                        {suggestion.s.W} lb/ft, Zx = {suggestion.s.Zx.toFixed(1)} in³
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm font-semibold text-rose-700">
+                      No safe W-shape found for the current demand set. Reduce demand or revise inputs.
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
+              </div>
+            ) : null}
+
+            {mode === "check" && out ? (
               <details className="rounded-2xl border border-slate-200 bg-white" id="beam-steps">
                 <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
                   Steps (show math)
@@ -547,18 +576,10 @@ export default function BendingShearPage() {
           </div>
 
           <aside className="md:col-span-4">
-            {out ? (
-              <div className="sticky top-6 md:top-[calc(var(--app-header-h,104px)+16px)] space-y-4">
-                <div className="hidden md:block">
-                  <PageSectionNav
-                    sections={[
-                      { id: "beam-general", label: "General" },
-                      { id: "beam-loads", label: "Loads" },
-                      { id: "beam-check", label: "Checks" },
-                      { id: "beam-steps", label: "Steps" },
-                    ]}
-                  />
-                </div>
+            <div className="sticky top-6 md:top-[calc(var(--app-header-h,104px)+16px)] space-y-4">
+              <div className="hidden md:block">
+                <PageSectionNav sections={sectionNavItems} />
+              </div>
                 <CalculatorActionRail
                   hideMobileBar
                   title="Actions"
@@ -569,6 +590,22 @@ export default function BendingShearPage() {
                   compare={{
                     storageKey: "ssc:compare:beam",
                     getCurrent: () => {
+                      if (mode === "design") {
+                        const lines: string[] = [
+                          `Method: ${designMethod} · Material: ${mat.key} · Mode: Design`,
+                          `Loads: Mu ${Mu} kip-ft · Vu ${Vu} kips · L ${L} in`,
+                        ];
+                        if (suggestion) {
+                          lines.push(
+                            `Suggested: ${suggestion.s.shape}`,
+                            `Weight: ${suggestion.s.W.toFixed(1)} plf`,
+                            `Zx: ${suggestion.s.Zx.toFixed(1)} in^3`,
+                          );
+                        } else {
+                          lines.push("Suggested: none (no safe W-shape found)");
+                        }
+                        return { title: "Beam — Design", lines };
+                      }
                       const gov = out?.beamLimitStates?.governing ?? out?.governingCase ?? "—";
                       const lines: string[] = [
                         `Method: ${designMethod} · Material: ${mat.key} · Mode: ${mode}`,
@@ -589,6 +626,26 @@ export default function BendingShearPage() {
                     },
                   }}
                   copyText={() => {
+                    if (mode === "design") {
+                      const lines = [
+                        "Beam — Design",
+                        `Method: ${designMethod}`,
+                        `Material: ${mat.key}`,
+                        `Mu: ${Mu} kip-ft`,
+                        `Vu: ${Vu} kips`,
+                        `L: ${L} in`,
+                      ];
+                      if (suggestion) {
+                        lines.push(
+                          `Suggested: ${suggestion.s.shape}`,
+                          `Weight: ${suggestion.s.W.toFixed(1)} plf`,
+                          `Zx: ${suggestion.s.Zx.toFixed(1)} in^3`,
+                        );
+                      } else {
+                        lines.push("Suggested: none (no safe W-shape found)");
+                      }
+                      return lines.join("\n");
+                    }
                     if (!out) return "Beam — No results";
                     const lines = [
                       "Beam",
@@ -609,12 +666,17 @@ export default function BendingShearPage() {
                     }
                     return lines.join("\n");
                   }}
-                  onGoResults={() => scrollTo("results")}
+                  onGoResults={() => scrollTo(resultAnchorId)}
                   onGoSteps={() => scrollTo("beam-steps")}
-                  json={{ data: { result: out, inputs: { material, shapeName, Mu, Vu, L, wLive, designMethod, unbracedLbIn, cbFactor } } }}
+                  json={{
+                    data: {
+                      result: mode === "design" ? suggestion?.check ?? null : out,
+                      inputs: { material, shapeName, Mu, Vu, L, wLive, designMethod, unbracedLbIn, cbFactor, mode },
+                    },
+                  }}
                   onReset={resetInputs}
                 />
-                {out.governingCase === "geometry_error" ? (
+                {mode === "check" && out?.governingCase === "geometry_error" ? (
                   <Card className="border-red-300 bg-red-50">
                     <CardBody className="text-sm text-red-950">
                       <p className="font-semibold">Cannot run analysis</p>
@@ -623,38 +685,40 @@ export default function BendingShearPage() {
                   </Card>
                 ) : null}
                 <div id="results">
-                <ResultHero
-                  status={out.governingCase === "geometry_error" ? "invalid" : out.isSafe ? "safe" : "unsafe"}
-                  governing={out.beamLimitStates?.governing ?? out.governingCase}
-                  capacityLabel={out.beamLimitStates ? "Max utilization" : "Capacity"}
-                  capacity={
-                    out.beamLimitStates
-                      ? `${(
-                          Math.max(
+                {mode === "check" && out ? (
+                  <ResultHero
+                    status={out.governingCase === "geometry_error" ? "invalid" : out.isSafe ? "safe" : "unsafe"}
+                    governing={out.beamLimitStates?.governing ?? out.governingCase}
+                    capacityLabel={out.beamLimitStates ? "Max utilization" : "Capacity"}
+                    capacity={
+                      out.beamLimitStates
+                        ? `${(
+                            Math.max(
+                              out.beamLimitStates.bending.ratio,
+                              out.beamLimitStates.shear.ratio,
+                              out.beamLimitStates.deflection.ratio,
+                            ) * 100
+                          ).toFixed(1)}%`
+                        : fmtKips(out.controllingStrength)
+                    }
+                    demandLabel={out.beamLimitStates ? "Demand (overall)" : "Demand"}
+                    demand={fmtKips(out.demand)}
+                    utilization={
+                      out.beamLimitStates
+                        ? Math.max(
                             out.beamLimitStates.bending.ratio,
                             out.beamLimitStates.shear.ratio,
                             out.beamLimitStates.deflection.ratio,
-                          ) * 100
-                        ).toFixed(1)}%`
-                      : fmtKips(out.controllingStrength)
-                  }
-                  demandLabel={out.beamLimitStates ? "Demand (overall)" : "Demand"}
-                  demand={fmtKips(out.demand)}
-                  utilization={
-                    out.beamLimitStates
-                      ? Math.max(
-                          out.beamLimitStates.bending.ratio,
-                          out.beamLimitStates.shear.ratio,
-                          out.beamLimitStates.deflection.ratio,
-                        )
-                      : out.controllingStrength > 0
-                        ? out.demand / out.controllingStrength
-                        : undefined
-                  }
-                />
+                          )
+                        : out.controllingStrength > 0
+                          ? out.demand / out.controllingStrength
+                          : undefined
+                    }
+                  />
+                ) : null}
                 </div>
 
-                {out.beamLimitStates && out.governingCase !== "geometry_error" ? (
+                {mode === "check" && out?.beamLimitStates && out.governingCase !== "geometry_error" ? (
                   <Card>
                     <CardBody className="space-y-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -689,25 +753,26 @@ export default function BendingShearPage() {
                   </Card>
                 ) : null}
 
-                <Card>
-                  <CardBody>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Design strengths</p>
-                    <div className="mt-3 space-y-2">
-                      {Object.entries(out.results).map(([key, value]) => (
-                        <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-700">{value.name}</span>
-                            <span className="font-semibold tabular-nums text-slate-950">
-                              {value.unit === "kip-ft" ? fmtKipFt(value.phiPn) : fmtKips(value.phiPn)} {value.unit}
-                            </span>
+                {mode === "check" && out ? (
+                  <Card>
+                    <CardBody>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Design strengths</p>
+                      <div className="mt-3 space-y-2">
+                        {Object.entries(out.results).map(([key, value]) => (
+                          <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-xs font-semibold text-slate-700">{value.name}</span>
+                              <span className="font-semibold tabular-nums text-slate-950">
+                                {value.unit === "kip-ft" ? fmtKipFt(value.phiPn) : fmtKips(value.phiPn)} {value.unit}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            ) : null}
+                        ))}
+                      </div>
+                    </CardBody>
+                  </Card>
+                ) : null}
+            </div>
           </aside>
         </CardBody>
       </Card>
