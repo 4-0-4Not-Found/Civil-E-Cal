@@ -218,11 +218,12 @@ export default function BendingShearPage() {
   }, [shape, mat, Mu, Vu, L, wLive, designMethod, derivedFromLoads, unbracedLbIn, cbFactor, mode]);
 
   const suggestion = useMemo(() => {
-    if (mode !== "design") return null;
     const Lin = derivedFromLoads?.Lin ?? Number(L);
     const w = derivedFromLoads?.wServiceKipIn ?? Number(wLive);
     const muUse = derivedFromLoads?.MuDer ?? Number(Mu);
     const vuUse = derivedFromLoads?.VuDer ?? Number(Vu);
+    if (![Lin, w, muUse, vuUse].every((n) => Number.isFinite(n))) return null;
+    if (!(Lin > 0)) return null;
     const lbParsed = Number(unbracedLbIn);
     const LbUse = unbracedLbIn.trim() !== "" && Number.isFinite(lbParsed) && lbParsed > 0 ? lbParsed : Lin;
     const cbParsed = Number(cbFactor);
@@ -264,7 +265,7 @@ export default function BendingShearPage() {
       .filter((c) => c.check.isSafe)
       .sort((a, b) => a.s.W - b.s.W);
     return candidates[0] ?? null;
-  }, [mode, Mu, Vu, mat, L, wLive, designMethod, derivedFromLoads, unbracedLbIn, cbFactor]);
+  }, [Mu, Vu, mat, L, wLive, designMethod, derivedFromLoads, unbracedLbIn, cbFactor]);
 
   function scrollTo(id: string) {
     try {
@@ -322,15 +323,15 @@ export default function BendingShearPage() {
       <Card>
         <CardHeader
           title="Bending, Shear & Deflection"
-          description="Analysis and design are separated: Analysis checks a chosen section (W/HSS), while Design searches for a lightest W-shape that passes."
+          description="Two modes (matching the client workbook): Analysis checks a chosen section (W/HSS). Design searches the lightest W-shape that passes."
         />
         <CardBody className="grid gap-6 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-12 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-bold text-slate-950">Quick workflow</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
-              <li>Choose mode first: Analysis (section check) or Design (auto-search W-shape).</li>
+              <li>Choose mode first: Analysis (check a chosen section) or Design (lightest W-shape search).</li>
               <li>Enter dead/live/span so Mu, Vu, L, and service deflection load auto-populate.</li>
-              <li>For Analysis, review checks and steps. For Design, review the suggested W-shape.</li>
+              <li>For Analysis, review checks and steps. For Design, review the suggested lightest W-shape.</li>
             </ol>
           </div>
           <div className="md:col-span-12 md:hidden">
@@ -341,7 +342,7 @@ export default function BendingShearPage() {
               <summary className="min-h-11 cursor-pointer px-4 py-3.5 text-sm font-extrabold tracking-tight text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:var(--brand)]/10 sm:px-5 sm:py-4">
                 1 · General
                 <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  Steel, member selection, check/design mode, and method.
+                  Steel, member selection, mode, and method.
                 </span>
                 <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   Units: ksi
@@ -373,7 +374,7 @@ export default function BendingShearPage() {
                     </Field>
                   ) : (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-900">Design mode (W-search)</p>
+                      <p className="font-semibold text-slate-900">Design mode (lightest W-shape search)</p>
                       <p className="mt-1">
                         Member selection is disabled here. The tool automatically searches W-shapes and returns the lightest safe option.
                       </p>
@@ -534,11 +535,39 @@ export default function BendingShearPage() {
             </details>
             ) : null}
 
+            {mode === "check" ? (
+              <Card className="border-slate-200 bg-white">
+                <CardBody>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">
+                    Lightest W-shape suggestion (Analysis mode)
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Uses your current demand set (M, V, L, deflection assumptions) to suggest the lightest W-shape that passes.
+                  </p>
+                  {suggestion ? (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xl font-extrabold tracking-tight text-slate-950">{suggestion.s.shape}</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {suggestion.s.W} lb/ft · Zx {suggestion.s.Zx.toFixed(1)} in³
+                      </p>
+                      <p className="mt-2 text-xs font-semibold text-slate-600">
+                        Tip: switch to Design mode if you want this suggestion to be the main workflow.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm font-semibold text-rose-700">
+                      No safe W-shape found for the current demand set. Reduce demand or revise inputs.
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
+            ) : null}
+
             {mode === "design" ? (
               <div id="beam-design-result">
               <Card className="border-slate-300 bg-white">
                 <CardBody>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Design of Beam (W-shape search)</p>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Design of Beam (lightest W-shape)</p>
                   {suggestion ? (
                     <>
                       <p className="mt-1 text-2xl font-bold text-slate-900">{suggestion.s.shape}</p>
