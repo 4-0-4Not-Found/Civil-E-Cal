@@ -20,6 +20,8 @@ export type BendingInput = {
   tw: number;
   a: number;
   isStiffened: boolean;
+  /** Optional shear panel / bracing height h (in) used for kv ratio h/a. */
+  shearPanelH?: number;
   Vu: number;
   Mu: number;
   /** Span / deflection reference length (in) */
@@ -206,7 +208,9 @@ export function calculateBendingShearDesign(input: BendingInput): CalculationOut
     return beamGeometryError(input, "Shear area A_w = h × t_w must be positive.");
   }
 
-  const kv = input.isStiffened ? (input.h / input.a > 3 ? 5 : 5 + 5 / (input.h / input.a) ** 2) : 5;
+  const shearPanelH = Number.isFinite(input.shearPanelH) && (input.shearPanelH ?? 0) > 0 ? (input.shearPanelH as number) : input.h;
+  const panelRatio = shearPanelH / Math.max(input.a, 1e-9);
+  const kv = input.isStiffened ? (panelRatio > 3 ? 5 : 5 + 5 / panelRatio ** 2) : 5;
   const lambdaV1 = 2.24 * Math.sqrt(E / Fy);
   const lambdaV2 = 1.1 * Math.sqrt((kv * E) / Fy);
   const lambdaV3 = 1.37 * Math.sqrt((kv * E) / Fy);

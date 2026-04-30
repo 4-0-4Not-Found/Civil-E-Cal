@@ -2,7 +2,6 @@ import { STORAGE } from "@/lib/storage/keys";
 import {
   summarizeBending,
   summarizeCompression,
-  summarizeConnectionsFromStorage,
   summarizeTension,
 } from "@/lib/report/build-summary";
 
@@ -18,25 +17,12 @@ export function parseModuleStringStore(key: string): Record<string, string> | nu
   }
 }
 
-/** Connections payload may include booleans (e.g. checkBearing). */
-export function parseConnectionsObjectStore(): Record<string, unknown> | null {
-  try {
-    const raw = localStorage.getItem(STORAGE.connections);
-    if (!raw) return null;
-    const o = JSON.parse(raw);
-    return typeof o === "object" && o !== null ? (o as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Read all four module blobs — call only in the browser after mount. */
+/** Read all module blobs — call only in the browser after mount. */
 export function readModuleStoresFromLocalStorage() {
   return {
     tension: parseModuleStringStore(STORAGE.tension),
     compression: parseModuleStringStore(STORAGE.compression),
     bending: parseModuleStringStore(STORAGE.bending),
-    connections: parseConnectionsObjectStore(),
   };
 }
 
@@ -46,6 +32,5 @@ export function summarizeModuleStores(stores: ReturnType<typeof readModuleStores
     tension: summarizeTension(stores.tension),
     compression: summarizeCompression(stores.compression),
     bending: summarizeBending(stores.bending),
-    connections: summarizeConnectionsFromStorage(stores.connections),
   };
 }

@@ -36,6 +36,8 @@ export default function CompressionPage() {
   const [designMinAg, setDesignMinAg] = useState("");
   const [designMinR, setDesignMinR] = useState("");
   const [useDesignFilters, setUseDesignFilters] = useState(false);
+  const [comparisonVisibility, setComparisonVisibility] = useState<"show" | "hide">("hide");
+  const [comparisonFilter, setComparisonFilter] = useState<"all" | "safe" | "unsafe">("all");
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -148,7 +150,6 @@ export default function CompressionPage() {
     if (mode !== "design") return [];
     return [...designPool]
       .sort((a, b) => a.W - b.W)
-      .slice(0, 24)
       .map((s) => {
         const r = calculateCompressionDesign({
           designMethod,
@@ -169,6 +170,11 @@ export default function CompressionPage() {
   const designSuggestion = useMemo(() => designRows.find((r) => r.safe) ?? null, [designRows]);
   const safeDesignRows = useMemo(() => designRows.filter((r) => r.safe), [designRows]);
   const unsafeDesignRows = useMemo(() => designRows.filter((r) => !r.safe), [designRows]);
+  const filteredDesignRows = useMemo(() => {
+    if (comparisonFilter === "safe") return safeDesignRows;
+    if (comparisonFilter === "unsafe") return unsafeDesignRows;
+    return designRows;
+  }, [comparisonFilter, designRows, safeDesignRows, unsafeDesignRows]);
 
   const csvRows = useMemo(() => {
     return [
@@ -417,36 +423,70 @@ export default function CompressionPage() {
                   <p className="text-xs font-semibold text-slate-600">
                     SAFE: {safeDesignRows.length} · NOT SAFE: {unsafeDesignRows.length}
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full min-w-[28rem] text-left text-sm text-slate-800">
-                      <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
-                        <tr>
-                          <th className="px-3 py-2">Shape</th>
-                          <th className="px-3 py-2">W (plf)</th>
-                          <th className="px-3 py-2">Governing</th>
-                          <th className="px-3 py-2">Strength</th>
-                          <th className="px-3 py-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {designRows.map((row) => (
-                          <tr key={row.shape} className="border-t border-slate-200">
-                            <td className="px-3 py-2 font-medium">{row.shape}</td>
-                            <td className="px-3 py-2">{row.W.toFixed(1)}</td>
-                            <td className="px-3 py-2">{row.gov}</td>
-                            <td className="px-3 py-2">{row.strength.toFixed(3)} kips</td>
-                            <td className="px-3 py-2">
-                              {row.safe ? (
-                                <span className="font-semibold text-emerald-800">SAFE</span>
-                              ) : (
-                                <span className="font-semibold text-rose-800">NOT SAFE</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Table</p>
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant={comparisonVisibility === "show" ? "secondary" : "primary"}
+                          size="sm"
+                          onClick={() => setComparisonVisibility(comparisonVisibility === "show" ? "hide" : "show")}
+                        >
+                          {comparisonVisibility === "show" ? "Hide comparison table" : "Show comparison table"}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Quick filters</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" variant={comparisonFilter === "all" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("all")}>
+                          All
+                        </Button>
+                        <Button type="button" variant={comparisonFilter === "safe" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("safe")}>
+                          SAFE
+                        </Button>
+                        <Button type="button" variant={comparisonFilter === "unsafe" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("unsafe")}>
+                          NOT SAFE
+                        </Button>
+                      </div>
+                    </div>
                   </div>
+                  {comparisonVisibility === "show" ? (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[28rem] text-left text-sm text-slate-800">
+                        <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+                          <tr>
+                            <th className="px-3 py-2">Shape</th>
+                            <th className="px-3 py-2">W (plf)</th>
+                            <th className="px-3 py-2">Governing</th>
+                            <th className="px-3 py-2">Strength</th>
+                            <th className="px-3 py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDesignRows.map((row) => (
+                            <tr key={row.shape} className="border-t border-slate-200">
+                              <td className="px-3 py-2 font-medium">{row.shape}</td>
+                              <td className="px-3 py-2">{row.W.toFixed(1)}</td>
+                              <td className="px-3 py-2">{row.gov}</td>
+                              <td className="px-3 py-2">{row.strength.toFixed(3)} kips</td>
+                              <td className="px-3 py-2">
+                                {row.safe ? (
+                                  <span className="font-semibold text-emerald-800">SAFE</span>
+                                ) : (
+                                  <span className="font-semibold text-rose-800">NOT SAFE</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                  {comparisonVisibility === "show" && filteredDesignRows.length === 0 ? (
+                    <p className="text-sm font-semibold text-slate-700">No rows match the selected filter.</p>
+                  ) : null}
                 </CardBody>
               </Card>
             ) : null}

@@ -54,7 +54,7 @@ export function ProjectBackupPanel() {
 
   const doClearAll = useCallback(() => {
     Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));
-    ["tension", "compression", "bending", "connections"].forEach((m) =>
+    ["tension", "compression", "bending"].forEach((m) =>
       localStorage.removeItem(`ssc:ts:${m}`),
     );
     localStorage.removeItem("ssc:lastRoute");

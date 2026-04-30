@@ -102,6 +102,8 @@ export default function TensionModulePage() {
   const [designMinAg, setDesignMinAg] = useState("");
   const [designMinR, setDesignMinR] = useState("");
   const [useDesignFilters, setUseDesignFilters] = useState(false);
+  const [comparisonVisibility, setComparisonVisibility] = useState<"show" | "hide">("hide");
+  const [comparisonFilter, setComparisonFilter] = useState<"all" | "safe" | "unsafe">("all");
   const [blkVw, setBlkVw] = useState("");
   const [blkVdh, setBlkVdh] = useState("0.875");
   const [blkVn, setBlkVn] = useState("2");
@@ -315,24 +317,20 @@ export default function TensionModulePage() {
         An: s.A,
         U: 1,
         demandPu: demand,
-        Agv: toNumber(Agv),
-        Anv: toNumber(Anv),
-        Agt: toNumber(Agt),
-        Ant: toNumber(Ant),
-        ubs: toNumber(ubs) || 0.5,
+        // Client request: "Design (lightest)" should not depend on Check/Analyze net area or block shear inputs.
+        // Omitting block shear inputs makes block shear non-controlling (∞) in calculateTensionDesign.
       });
       if (r.isSafe) return s;
     }
     return null;
-  }, [mode, designPool, Pu, selectedMaterial, designMethod, Agv, Anv, Agt, Ant, ubs]);
+  }, [mode, designPool, Pu, selectedMaterial, designMethod]);
 
-  /** Design mode: compare first 16 lightest shapes (same assumptions as design suggestion). */
+  /** Design mode: compare lightest shapes in the current pool (same assumptions as design suggestion). */
   const designComparisonRows = useMemo(() => {
     if (mode !== "design" || designPool.length === 0) return [];
     const demand = toNumber(Pu);
     return [...designPool]
       .sort((a, b) => a.W - b.W)
-      .slice(0, 24)
       .map((s) => {
         const r = calculateTensionDesign({
           designMethod,
@@ -342,11 +340,7 @@ export default function TensionModulePage() {
           An: s.A,
           U: 1,
           demandPu: demand,
-          Agv: toNumber(Agv),
-          Anv: toNumber(Anv),
-          Agt: toNumber(Agt),
-          Ant: toNumber(Ant),
-          ubs: toNumber(ubs) || 0.5,
+          // Design comparison also ignores Check/Analyze net area + block shear inputs (client request).
         });
         return {
           shape: s.shape,
@@ -356,10 +350,15 @@ export default function TensionModulePage() {
           gov: r.governingCase,
         };
       });
-  }, [mode, designPool, Pu, selectedMaterial, designMethod, Agv, Anv, Agt, Ant, ubs]);
+  }, [mode, designPool, Pu, selectedMaterial, designMethod]);
 
   const safeDesignRows = useMemo(() => designComparisonRows.filter((r) => r.safe), [designComparisonRows]);
   const unsafeDesignRows = useMemo(() => designComparisonRows.filter((r) => !r.safe), [designComparisonRows]);
+  const filteredDesignRows = useMemo(() => {
+    if (comparisonFilter === "safe") return safeDesignRows;
+    if (comparisonFilter === "unsafe") return unsafeDesignRows;
+    return designComparisonRows;
+  }, [comparisonFilter, designComparisonRows, safeDesignRows, unsafeDesignRows]);
 
   const csvRows = useMemo(() => {
     const rows: string[][] = [
@@ -676,6 +675,74 @@ export default function TensionModulePage() {
                     </p>
                   </div>
                 </div>
+
+                <Card className="mt-4 shadow-none border border-dashed border-slate-300 bg-white">
+                  <CardBody className="space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">Net Area Solver (AISC D3)</p>
+                        <p className="mt-1 text-sm text-slate-700">
+                          Computes net width for a plate strip. Enter one or more pitch/gage values (comma-separated) and copy A<sub>n</sub> to the net area field.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Gross width W" hint="in — along failure path">
+                        <TextInputWithUnit value={stagW} onChange={setStagW} unit="in" placeholder="e.g. 8" inputMode="decimal" />
+                      </Field>
+                      <Field label="Hole dia d_h" hint="in">
+                        <TextInputWithUnit value={stagDh} onChange={setStagDh} unit="in" inputMode="decimal" />
+                      </Field>
+                      <Field label="Number of holes n" hint="on that path">
+                        <TextInput value={stagN} onChange={setStagN} />
+                      </Field>
+                      <Field label="Thickness t" hint="in">
+                        <TextInputWithUnit value={stagT} onChange={setStagT} unit="in" inputMode="decimal" />
+                      </Field>
+                      <Field label="Pitch s" hint="in — one or more values (comma-separated)">
+                        <TextInputWithUnit value={stagS} onChange={setStagS} unit="in" inputMode="decimal" />
+                      </Field>
+                      <Field label="Gage g" hint="in — one or more values (comma-separated)">
+                        <TextInputWithUnit value={stagG} onChange={setStagG} unit="in" inputMode="decimal" />
+                      </Field>
+                    </div>
+
+                    {staggerHelp ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
+                        <span className="tabular-nums">
+                          Net width = {staggerHelp.netWidth.toFixed(4)} in → A<sub>n</sub> = {staggerHelp.an.toFixed(4)} in²{staggerHelp.staggerPairsUsed > 0 ? ` (using ${staggerHelp.staggerPairsUsed} s/g pair${staggerHelp.staggerPairsUsed === 1 ? "" : "s"})` : ""}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(staggerHelp.netWidth.toFixed(4));
+                              } catch {
+                                /* ignore */
+                              }
+                            }}
+                          >
+                            Copy net width
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            type="button"
+                            onClick={() => setAn(String(Math.round(staggerHelp.an * 10000) / 10000))}
+                          >
+                            Copy A_n to net area
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-600">Enter W, d_h, t, and n to compute. Add optional s/g lists for stagger corrections.</p>
+                    )}
+                  </CardBody>
+                </Card>
               </div>
             </details>
 
@@ -685,7 +752,7 @@ export default function TensionModulePage() {
                   <p className="text-sm font-semibold text-slate-950">Suggested section (lightest in family that passes)</p>
                   <p className="mt-1 text-xl font-extrabold tracking-tight text-slate-950">{designSuggestion.shape}</p>
                   <p className="mt-1 text-sm text-slate-700">
-                    {designSuggestion.W} lb/ft — uses gross = net areas and your block-shear inputs; switch to Check to enter real A<sub>n</sub> and holes.
+                    {designSuggestion.W} lb/ft — based on required Pu/Pa and optional min Ag / min r filters. Switch to Check to enter net area and block shear inputs for the chosen section.
                   </p>
                 </CardBody>
               </Card>
@@ -700,64 +767,79 @@ export default function TensionModulePage() {
                   <p className="text-xs font-semibold text-slate-600">
                     SAFE: {safeDesignRows.length} · NOT SAFE: {unsafeDesignRows.length}
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full min-w-[28rem] text-left text-sm text-slate-800">
-                      <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
-                        <tr>
-                          <th className="px-3 py-2">Shape</th>
-                          <th className="px-3 py-2">W (plf)</th>
-                          <th className="px-3 py-2">Governing</th>
-                          <th className="px-3 py-2">Strength</th>
-                          <th className="px-3 py-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {designComparisonRows.map((row) => (
-                          <tr key={row.shape} className="border-t border-slate-200">
-                            <td className="px-3 py-2 font-medium">{row.shape}</td>
-                            <td className="px-3 py-2">{fmt(row.W, 1)}</td>
-                            <td className="px-3 py-2">{row.gov}</td>
-                            <td className="px-3 py-2">{fmt(row.strength)} kips</td>
-                            <td className="px-3 py-2">
-                              {row.safe ? (
-                                <span className="font-semibold text-emerald-800">SAFE</span>
-                              ) : (
-                                <span className="font-semibold text-rose-800">NOT SAFE</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                      Accessible SAFE / NOT SAFE lists
-                    </summary>
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Safe shapes</p>
-                        <p className="mt-1 text-sm text-slate-700">
-                          {safeDesignRows.length > 0 ? safeDesignRows.map((r) => r.shape).join(", ") : "None"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Not safe shapes</p>
-                        <p className="mt-1 text-sm text-slate-700">
-                          {unsafeDesignRows.length > 0 ? unsafeDesignRows.map((r) => r.shape).join(", ") : "None"}
-                        </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Table</p>
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant={comparisonVisibility === "show" ? "secondary" : "primary"}
+                          size="sm"
+                          onClick={() => setComparisonVisibility(comparisonVisibility === "show" ? "hide" : "show")}
+                        >
+                          {comparisonVisibility === "show" ? "Hide comparison table" : "Show comparison table"}
+                        </Button>
                       </div>
                     </div>
-                  </details>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Quick filters</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" variant={comparisonFilter === "all" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("all")}>
+                          All
+                        </Button>
+                        <Button type="button" variant={comparisonFilter === "safe" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("safe")}>
+                          SAFE
+                        </Button>
+                        <Button type="button" variant={comparisonFilter === "unsafe" ? "primary" : "secondary"} size="sm" onClick={() => setComparisonFilter("unsafe")}>
+                          NOT SAFE
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  {comparisonVisibility === "show" ? (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[28rem] text-left text-sm text-slate-800">
+                        <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+                          <tr>
+                            <th className="px-3 py-2">Shape</th>
+                            <th className="px-3 py-2">W (plf)</th>
+                            <th className="px-3 py-2">Governing</th>
+                            <th className="px-3 py-2">Strength</th>
+                            <th className="px-3 py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDesignRows.map((row) => (
+                            <tr key={row.shape} className="border-t border-slate-200">
+                              <td className="px-3 py-2 font-medium">{row.shape}</td>
+                              <td className="px-3 py-2">{fmt(row.W, 1)}</td>
+                              <td className="px-3 py-2">{row.gov}</td>
+                              <td className="px-3 py-2">{fmt(row.strength)} kips</td>
+                              <td className="px-3 py-2">
+                                {row.safe ? (
+                                  <span className="font-semibold text-emerald-800">SAFE</span>
+                                ) : (
+                                  <span className="font-semibold text-rose-800">NOT SAFE</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                  {comparisonVisibility === "show" && filteredDesignRows.length === 0 ? (
+                    <p className="text-sm font-semibold text-slate-700">No rows match the selected filter.</p>
+                  ) : null}
                 </CardBody>
               </Card>
             ) : null}
 
             <details id="tension-block-shear" className="rounded-2xl border border-slate-200 bg-white">
               <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
-                3 · Block shear + Net Area Solver
+                3 · Block shear
                 <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  Block shear (J4.3) plus a Net Area Solver (D3) that supports multiple stagger spacing values.
+                  Block shear (J4.3). Use the Geometry Helper below to compute Agv/Anv/Agt/Ant.
                 </span>
               </summary>
               <div className="border-t border-slate-200 p-5 space-y-4">
@@ -863,76 +945,6 @@ export default function TensionModulePage() {
                   </CardBody>
                 </Card>
 
-                <Card className="shadow-none border border-dashed border-slate-300 bg-white">
-                  <CardBody className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">Net Area Solver (AISC D3)</p>
-                        <p className="mt-1 text-sm text-slate-700">
-                          Computes net width for a plate strip. Enter one or more pitch/gage values (comma-separated) and copy A<sub>n</sub> to the net area field.
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="sm" type="button" onClick={() => scrollTo("tension-net-area")}>
-                        Go to net area
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Gross width W" hint="in — along failure path">
-                        <TextInputWithUnit value={stagW} onChange={setStagW} unit="in" placeholder="e.g. 8" inputMode="decimal" />
-                      </Field>
-                      <Field label="Hole dia d_h" hint="in">
-                        <TextInputWithUnit value={stagDh} onChange={setStagDh} unit="in" inputMode="decimal" />
-                      </Field>
-                      <Field label="Number of holes n" hint="on that path">
-                        <TextInput value={stagN} onChange={setStagN} />
-                      </Field>
-                      <Field label="Thickness t" hint="in">
-                        <TextInputWithUnit value={stagT} onChange={setStagT} unit="in" inputMode="decimal" />
-                      </Field>
-                      <Field label="Pitch s" hint="in — one or more values (comma-separated)">
-                        <TextInputWithUnit value={stagS} onChange={setStagS} unit="in" inputMode="decimal" />
-                      </Field>
-                      <Field label="Gage g" hint="in — one or more values (comma-separated)">
-                        <TextInputWithUnit value={stagG} onChange={setStagG} unit="in" inputMode="decimal" />
-                      </Field>
-                    </div>
-
-                    {staggerHelp ? (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
-                        <span className="tabular-nums">
-                          Net width = {staggerHelp.netWidth.toFixed(4)} in → A<sub>n</sub> = {staggerHelp.an.toFixed(4)} in²{staggerHelp.staggerPairsUsed > 0 ? ` (using ${staggerHelp.staggerPairsUsed} s/g pair${staggerHelp.staggerPairsUsed === 1 ? "" : "s"})` : ""}
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(staggerHelp.netWidth.toFixed(4));
-                              } catch {
-                                /* ignore */
-                              }
-                            }}
-                          >
-                            Copy net width
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            type="button"
-                            onClick={() => setAn(String(Math.round(staggerHelp.an * 10000) / 10000))}
-                          >
-                            Copy A_n to net area
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-600">Enter W, d_h, t, and n to compute. Add optional s/g lists for stagger corrections.</p>
-                    )}
-                  </CardBody>
-                </Card>
               </div>
             </details>
 

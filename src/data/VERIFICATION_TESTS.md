@@ -1,4 +1,4 @@
-# Manual verification tests (four modules)
+# Manual verification tests
 
 **Automated:** The same numerical expectations are asserted in Vitest — `src/lib/calculations/calculations-verification.test.ts`. Run **`npm run test`** in `aisc-pwa` (no browser required).
 
@@ -11,14 +11,13 @@
 | Tension | `/tension` | `material`, `shapeName`, `designMethod`, `mode`, `Pu`, `U`, `Ag`, `An`, `Agv`, `Anv`, `Agt`, `Ant`, `ubs`, stagger: `stagW`, `stagDh`, `stagN`, `stagS`, `stagG`, `stagT`, `shapeFamily` |
 | Compression | `/compression` | `material`, `shapeFamily`, `shapeName`, `k`, `L`, `Pu`, `designMethod` |
 | Bending | `/bending-shear` | `designMethod`, `material`, `shapeName`, `mode`, `Mu`, `Vu`, `L`, `wLive`, `deadLoadKft`, `liveLoadKft`, `spanFt`, `unbracedLbIn`, `cbFactor` |
-| Connections | `/connections` | `designMethod`, `shearMode`, `vu`, `tu`, `boltGroup`, `dBolt`, `nBolts`, `shearPlanes`, `threadMode`, `checkBearing`, `plateFu`, `plateT`, `lcMin`, `surfaceClass`, `slipHf`, `fexx`, `legIn`, `weldLen`, `weldDemand` |
 | Report | `/report` | Reads all of the above keys (see `src/lib/storage/keys.ts`). |
 
 **How to use this file**
 
 - **Inputs** = fields in the PWA at the route shown.
 - **Expected (app engine)** = values produced by the same calculation code the UI uses (run `npx tsx scripts/compute-verification-fixtures.ts` to regenerate).
-- **“Like Excel”:** Enter the same inputs in the **Jason** (members) or **Jaypee** (connections) workbook. The app should **agree within rounding**; Excel may differ slightly if cells round at each step.
+- **“Like Excel”:** Enter the same inputs in the **Jason** workbook. The app should **agree within rounding**; Excel may differ slightly if cells round at each step.
 
 ---
 
@@ -52,19 +51,6 @@
 | **B2** | ASD — same D+L **strength** w (D+L klf) | Same geometry, **ASD**, same D/L/span so required M,V from **4.0** klf → **M** **450** kip·ft, **V** **60** kips (auto-filled path) | M_n/Ω ≈ **686.848** kip·ft, V_n/Ω ≈ **273.218** kips. Governing **bending**. **SAFE**. |
 | **B3** | Manual **Option B** — user M, V, L, w | Clear D/L/span; set **M_u** 200, **V_u** 40, **L** 360 in, **w** (deflection) 0.05 kip/in, same shape | Compare φM_n, φV_n, δ vs limits; SAFE if all ratios ≤ 1. (Exact numbers depend on shape.) |
 | **B4** | Design — least weight W | Mode **Design**, set loads/span or M,V,L/w, material | Suggestion = lightest **W** that passes bending, shear, deflection (per Ej). |
-
----
-
-## 4. Connections — `/connections`
-
-| ID | Use case | Fields & values | Expected (app engine) |
-|----|-----------|-----------------|------------------------|
-| **N1** | Bearing mode — **shear-only** check (no bearing plate limit) | **LRFD**, mode **Bearing**, **Vu** 120, **A325**, **d** 0.75, **n** 4, **shear planes** 2, threads **N**, **Include bearing** off | **F_nv** **54** ksi, φR_n shear ≈ **143.139** kips, governing same. **SAFE** for shear. |
-| **N2** | Slip-critical — **NOT SAFE** | **Slip** mode, **Vu** 80, Class **A**, **h_f** 1, 4 bolts 0.75 **A325**, 2 slip planes, **LRFD** | **T_b** **28** kips, available slip ≈ **75.936** kips. **NOT SAFE** (75.9 < 80). |
-| **N3** | Bolt tension — **NOT SAFE** | **Tu** 150, 4 bolts 0.75 **A325**, **N** | **F_nt** **90** ksi, φR_n tension ≈ **119.282** kips. **NOT SAFE**. |
-| **N4** | Shear + tension interaction — **SAFE** | Bearing on, **Vu** 60, **Tu** 40, plate **F_u** 65, **t** 0.5, **L_c** 1.25, 4 bolts 0.75 **A325**, 2 planes, **N** | Interaction sum ≈ **0.288** (≤ 1). **SAFE**. |
-| **N5** | Fillet weld — demand exceeds capacity | **F_EXX** 70, leg **0.25** in, length **4** in, demand **50** kips | Throat ≈ **0.1768** in, φR_n ≈ **22.27** kips. **NOT SAFE** for 50 kip demand. |
-| **N6** | ASD display | Same as N1, switch **ASD** | Allowable shear/bearing uses R_n/Ω; values scale vs LRFD per code in UI. |
 
 ---
 

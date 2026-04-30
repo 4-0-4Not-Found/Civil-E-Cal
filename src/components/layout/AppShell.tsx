@@ -17,6 +17,10 @@ function AppFooter() {
                 •
               </span>
               <span className="font-semibold text-slate-800">Jay-R Suniga</span>
+              <span className="text-slate-300" aria-hidden="true">
+                •
+              </span>
+              <span className="font-semibold text-slate-800">Harry Vio Garcia</span>
             </div>
           </div>
         </div>

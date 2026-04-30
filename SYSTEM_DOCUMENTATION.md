@@ -30,7 +30,6 @@ This tool is intended for **educational use** and does not replace professional 
   - Tension
   - Compression
   - Beam (bending, shear, deflection)
-  - Connections (bolts + welds, with optional helpers)
   - Report (combined snapshot)
   - Info (capabilities, units, limitations, tips)
 - **Local persistence**: module inputs auto-save in the browser.
@@ -50,7 +49,6 @@ Key user-facing routes:
 - `/tension`
 - `/compression`
 - `/bending-shear`
-- `/connections`
 - `/report`
 - `/info`
 - `/offline` (PWA fallback page)
@@ -73,8 +71,6 @@ Key calculation entry points include:
 - `src/lib/calculations/tension.ts`: `calculateTensionDesign(...)`
 - `src/lib/calculations/compression.ts`: `calculateCompressionDesign(...)`
 - `src/lib/calculations/bending.ts`: `calculateBendingShearDesign(...)`
-- `src/lib/calculations/connections.ts`: bolt and weld checks (e.g., `calculateBoltShearBearingCombinedLRFD`, `calculateBoltSlipCritical`, `calculateFilletWeldLRFD`)
-- `src/lib/calculations/connections-advanced.ts`: optional helpers (e.g., groove weld shear, approximate prying thickness helper)
 
 Calculation functions return a structured output (see `src/lib/types/calculation`) that includes:
 - a numeric **capacity/strength** (and demand),
@@ -155,30 +151,6 @@ These routes are intentionally restricted in production builds to keep deploymen
 - Summary results rendered in `ResultHero` + limit-state cards
 - Step-by-step calculation output
 
-### Connections
-**Route**: `/connections`  
-**Purpose**: Provide bolt and weld checks commonly used in introductory steel connection design, including interaction where applicable.
-
-**Key functions (calculation layer)**:
-- Bolt shear/bearing combination: `calculateBoltShearBearingCombinedLRFD(...)`
-- Slip-critical: `calculateBoltSlipCritical(...)`
-- Bolt tension: `calculateBoltTensionLRFD(...)`
-- Interaction: `calculateBoltShearTensionInteractionLRFD(...)`
-- Fillet weld: `calculateFilletWeldLRFD(...)`, helper `filletWeldMinLegInForDemand(...)`
-- Optional helpers: groove weld shear + approximate prying thickness (`src/lib/calculations/connections-advanced.ts`)
-
-**Key inputs (UI-level)**:
-- Design method (LRFD/ASD where supported by the module)
-- Bolt group + diameter + count + threads-in/out selection
-- Shear planes and demand forces (\(V_u\), \(T_u\))
-- Plate inputs for bearing checks (thickness, \(F_u\), clear distance \(L_c\))
-- Weld inputs (electrode strength, leg/throat, length, demand)
-
-**Outputs**:
-- Overall safe/unsafe status based on the enabled checks
-- Per-check capacities, suggested bolt counts (where computed), and interaction values
-- Export/copy/report compatibility via saved inputs
-
 ### Report
 **Route**: `/report`  
 **Purpose**: Present a combined project summary derived from saved module inputs in the current browser.
@@ -192,7 +164,7 @@ These routes are intentionally restricted in production builds to keep deploymen
 - Saved browser state only (no manual inputs on the Report page)
 
 **Outputs**:
-- A combined summary for Tension, Compression, Beam, and Connections
+- A combined summary for Tension, Compression, and Beam
 - Print/PDF-friendly layout, including calculation step tables when available
 
 ### Info
@@ -245,7 +217,7 @@ These routes are intentionally restricted in production builds to keep deploymen
 
 ### `src/app/`
 Holds page routes and route handlers:
-- module pages (`/tension`, `/compression`, `/bending-shear`, `/connections`)
+- module pages (`/tension`, `/compression`, `/bending-shear`)
 - supporting routes (`/report`, `/info`, `/offline`)
 - development diagnostic API routes under `src/app/api/`
 

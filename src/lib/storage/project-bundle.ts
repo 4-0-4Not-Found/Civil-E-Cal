@@ -17,7 +17,6 @@ export function collectBundle() {
     tension: safeJsonParse(typeof window !== "undefined" ? localStorage.getItem(STORAGE.tension) : null),
     compression: safeJsonParse(typeof window !== "undefined" ? localStorage.getItem(STORAGE.compression) : null),
     bending: safeJsonParse(typeof window !== "undefined" ? localStorage.getItem(STORAGE.bending) : null),
-    connections: safeJsonParse(typeof window !== "undefined" ? localStorage.getItem(STORAGE.connections) : null),
   };
 }
 
@@ -35,10 +34,6 @@ export function applyBundle(data: unknown) {
   }
   if (typeof o.bending === "object" && o.bending !== null) {
     localStorage.setItem(STORAGE.bending, JSON.stringify(o.bending));
-    wrote = true;
-  }
-  if (typeof o.connections === "object" && o.connections !== null) {
-    localStorage.setItem(STORAGE.connections, JSON.stringify(o.connections));
     wrote = true;
   }
   return wrote;

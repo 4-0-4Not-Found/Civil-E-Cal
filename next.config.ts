@@ -17,13 +17,12 @@ const OFFLINE_SHELL_ROUTES = [
   "/tension",
   "/compression",
   "/bending-shear",
-  "/connections",
   "/report",
   "/info",
   "/workspace",
 ];
 
-const APP_SHELL_REVISION = "app-shell-v8";
+const APP_SHELL_REVISION = "app-shell-v9";
 
 function normalizeManifestPath(url: string): string {
   try {

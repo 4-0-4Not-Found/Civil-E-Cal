@@ -6,23 +6,14 @@
  * - `/tension` — material, shapeName, Ag, An, U, Pu, Agv, Anv, Agt, Ant, ubs, designMethod
  * - `/compression` — material, shapeName, k, L, Pu, designMethod
  * - `/bending-shear` — designMethod, material, shapeName, deadLoadKft, liveLoadKft, spanFt, Mu, Vu, L, wLive, unbracedLbIn, cbFactor
- * - `/connections` — designMethod, shearMode, vu, tu, boltGroup, dBolt, nBolts, shearPlanes, threadMode, checkBearing, plateFu, plateT, lcMin, surfaceClass, slipHf, fexx, legIn, weldLen, weldDemand
  */
 import { describe, expect, it } from "vitest";
 import shapes from "@/data/aisc-shapes-v16.json";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import { calculateCompressionDesign } from "@/lib/calculations/compression";
-import {
-  calculateBoltShearBearingCombinedLRFD,
-  calculateBoltShearTensionInteractionLRFD,
-  calculateBoltSlipCritical,
-  calculateBoltTensionLRFD,
-  calculateFilletWeldLRFD,
-  lrfdToAsdSamePhiOmega,
-} from "@/lib/calculations/connections";
 import { calculateTensionDesign } from "@/lib/calculations/tension";
 import { staggeredNetWidthInches } from "@/lib/calculations/net-area";
-import { summarizeConnectionsFromStorage, summarizeTension } from "@/lib/report/build-summary";
+import { summarizeTension } from "@/lib/report/build-summary";
 import type { AiscShape } from "@/lib/aisc/types";
 
 const E = 29000;
@@ -262,111 +253,7 @@ describe("Bending (calculateBendingShearDesign) — fields: designMethod, materi
   });
 });
 
-describe("Connections — fields: designMethod, shearMode, vu, tu, boltGroup, dBolt, nBolts, shearPlanes, threadMode, checkBearing, plateFu, plateT, lcMin, surfaceClass, slipHf, fexx, legIn, weldLen, weldDemand", () => {
-  it("N1 bearing — includeBearing false, shear-only SAFE", () => {
-    const n1 = calculateBoltShearBearingCombinedLRFD({
-      demandVu: 120,
-      boltGroup: "A325",
-      threadMode: "N",
-      dBolt: 0.75,
-      nBolts: 4,
-      shearPlanes: 2,
-      includeBearing: false,
-      lcMinIn: 1.25,
-      plateThicknessIn: 0.5,
-      plateFuKsi: 65,
-    });
-    expect(n1.shear.Fnv).toBe(54);
-    expect(n1.phiRnTotalGoverning).toBeCloseTo(143.139, 2);
-    expect(n1.isSafe).toBe(true);
-  });
-
-  it("N2 slip-critical — NOT SAFE (Vu > available slip)", () => {
-    const n2 = calculateBoltSlipCritical({
-      demandVu: 80,
-      boltGroup: "A325",
-      dBolt: 0.75,
-      nBolts: 4,
-      slipPlanes: 2,
-      surfaceClass: "A",
-      hf: 1,
-      designMethod: "LRFD",
-    });
-    expect(n2).not.toBeNull();
-    expect(n2!.Tb).toBe(28);
-    expect(n2!.availableSlip).toBeCloseTo(75.936, 2);
-    expect(n2!.isSafe).toBe(false);
-  });
-
-  it("N3 bolt tension — NOT SAFE", () => {
-    const n3 = calculateBoltTensionLRFD({
-      demandTu: 150,
-      boltGroup: "A325",
-      threadMode: "N",
-      dBolt: 0.75,
-      nBolts: 4,
-    });
-    expect(n3.Fnt).toBe(90);
-    expect(n3.phiRnTotal).toBeCloseTo(119.282, 2);
-    expect(n3.isSafe).toBe(false);
-  });
-
-  it("N4 shear–tension interaction — SAFE", () => {
-    const n4b = calculateBoltShearBearingCombinedLRFD({
-      demandVu: 60,
-      boltGroup: "A325",
-      threadMode: "N",
-      dBolt: 0.75,
-      nBolts: 4,
-      shearPlanes: 2,
-      includeBearing: true,
-      lcMinIn: 1.25,
-      plateThicknessIn: 0.5,
-      plateFuKsi: 65,
-    });
-    const n4t = calculateBoltTensionLRFD({
-      demandTu: 40,
-      boltGroup: "A325",
-      threadMode: "N",
-      dBolt: 0.75,
-      nBolts: 4,
-    });
-    const int = calculateBoltShearTensionInteractionLRFD({
-      demandVu: 60,
-      demandTu: 40,
-      phiRnShearTotal: n4b.phiRnTotalGoverning,
-      phiRnTensionTotal: n4t.phiRnTotal,
-    });
-    expect(int.interactionSum).toBeCloseTo(0.288, 2);
-    expect(int.isSafe).toBe(true);
-  });
-
-  it("N5 fillet weld — demand exceeds φRn", () => {
-    const n5 = calculateFilletWeldLRFD({ fexx: 70, legIn: 0.25, lengthIn: 4, demand: 50 });
-    expect(n5.throat).toBeCloseTo(0.1767, 3);
-    expect(n5.phiRn).toBeCloseTo(22.27, 2);
-    expect(n5.isSafe).toBe(false);
-  });
-
-  it("N6 ASD — N1 shear capacity scales to allowable", () => {
-    const n1 = calculateBoltShearBearingCombinedLRFD({
-      demandVu: 120,
-      boltGroup: "A325",
-      threadMode: "N",
-      dBolt: 0.75,
-      nBolts: 4,
-      shearPlanes: 2,
-      includeBearing: false,
-      lcMinIn: 1.25,
-      plateThicknessIn: 0.5,
-      plateFuKsi: 65,
-    });
-    const asd = lrfdToAsdSamePhiOmega(n1.phiRnTotalGoverning);
-    expect(asd).toBeCloseTo(n1.phiRnTotalGoverning / (0.75 * 2), 4);
-  });
-});
-
-describe("Report pipeline — summarizeTension / summarizeConnectionsFromStorage (string payloads like localStorage)", () => {
+describe("Report pipeline — summarizeTension (string payloads like localStorage)", () => {
   it("T1 strings — same controlling strength as calculateTensionDesign", () => {
     const p: Record<string, string> = {
       material: "A992",
@@ -387,33 +274,5 @@ describe("Report pipeline — summarizeTension / summarizeConnectionsFromStorage
       expect(s.output.controllingStrength).toBeCloseTo(698.438, 2);
       expect(s.output.governingCase).toBe("blockShear");
     }
-  });
-
-  it("connections JSON — N1-style payload, shear SAFE", () => {
-    const raw: Record<string, unknown> = {
-      designMethod: "LRFD",
-      shearMode: "bearing",
-      vu: "120",
-      tu: "0",
-      boltGroup: "A325",
-      dBolt: "0.75",
-      nBolts: "4",
-      shearPlanes: "2",
-      threadMode: "N",
-      checkBearing: false,
-      plateFu: "65",
-      plateT: "0.5",
-      lcMin: "1.25",
-      surfaceClass: "A",
-      slipHf: "1",
-      fexx: "70",
-      legIn: "0.25",
-      weldLen: "4",
-      weldDemand: "50",
-    };
-    const s = summarizeConnectionsFromStorage(raw);
-    expect(s.ok).toBe(true);
-    expect(s.phiRnShearGoverning).toBeCloseTo(143.139, 2);
-    expect(s.shearSafe).toBe(true);
   });
 });

@@ -20,7 +20,7 @@ All engineering computations are performed locally (no external calculation serv
 
 ## Features
 
-- **Multiple calculators (modules)**: Tension, Compression, Beam, and Connections
+- **Multiple calculators (modules)**: Tension, Compression, and Beam
 - **Report**: Combined snapshot of saved module work from this browser
 - **Info**: Capabilities, units, limitations, and workflow tips
 - **Local persistence**: Inputs auto-save to `localStorage`
@@ -37,7 +37,6 @@ All engineering computations are performed locally (no external calculation serv
 | **Tension** | `/tension` | Gross yielding, net-section fracture, block shear (with an optional stagger helper) |
 | **Compression** | `/compression` | Member compression/buckling-style checks with K and length inputs |
 | **Beam (Bending & Shear)** | `/bending-shear` | Flexure, shear, and deflection checks; includes a load-to-demand helper |
-| **Connections** | `/connections` | Bolt shear/bearing, slip-critical slip, bolt tension and interaction; fillet/groove weld checks and optional helpers |
 | **Report** | `/report` | Reads saved module state and renders a printable project summary |
 | **Info** | `/info` | What the tool covers, units/conventions, limitations, and tips |
 
@@ -64,7 +63,6 @@ src/
 │   ├── tension/page.tsx      # Tension module page
 │   ├── compression/page.tsx  # Compression module page
 │   ├── bending-shear/page.tsx# Beam module page
-│   ├── connections/page.tsx  # Connections module page
 │   ├── report/page.tsx       # Report page (reads saved browser state)
 │   ├── info/page.tsx         # Help, units, limitations
 │   ├── offline/page.tsx      # Offline fallback page (PWA)

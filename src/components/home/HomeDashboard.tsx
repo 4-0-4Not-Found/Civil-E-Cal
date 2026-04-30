@@ -112,8 +112,6 @@ function emptyModuleState(): Record<ModuleKey, { hasData: boolean; savedTs: numb
     tension: { hasData: false, savedTs: null },
     compression: { hasData: false, savedTs: null },
     bending: { hasData: false, savedTs: null },
-    // Legacy key retained for compatibility with old localStorage payloads.
-    connections: { hasData: false, savedTs: null },
   };
 }
 
