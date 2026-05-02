@@ -1,4 +1,5 @@
 import { aiscShapes } from "@/lib/aisc/data";
+import { beamSimplySupportedUniformDeflectionIn } from "@/lib/excel-parity";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import { calculateCompressionDesign } from "@/lib/calculations/compression";
 import { calculateTensionDesign } from "@/lib/calculations/tension";
@@ -119,18 +120,23 @@ export function summarizeBending(p: Record<string, string> | null): BendingSumma
     let w = toN(p.wLive);
     let muUse = toN(p.Mu);
     let vuUse = toN(p.Vu);
+    let derivedBeamLoads = false;
     if (Number.isFinite(DL) && Number.isFinite(LL) && Number.isFinite(Lft) && Lft > 0) {
+      derivedBeamLoads = true;
       const wStr =
         p.designMethod === "ASD"
           ? DL + LL
           : Math.max(1.4 * DL, 1.2 * DL + 1.6 * LL);
       muUse = (wStr * Lft * Lft) / 8;
       vuUse = (wStr * Lft) / 2;
-      w = (DL + LL) / 12;
+      /** Legacy step display (kip/in); δ uses excel-parity helper when derived loads present. */
+      w = LL / 12;
       Lin = Lft * 12;
     }
     const hBeam = shape.h && shape.h > 0 ? shape.h : shape.d - 2 * shape.tf;
-    const delta = (5 / 384) * w * Lin ** 4 / (29000 * (shape.Ix || 1));
+    const delta = derivedBeamLoads
+      ? beamSimplySupportedUniformDeflectionIn(LL, Lft, 29000, shape.Ix || 1)
+      : (5 / 384) * w * Lin ** 4 / (29000 * (shape.Ix || 1));
     const lbParsed = toN(p.unbracedLbIn);
     const LbUse = p.unbracedLbIn?.trim() !== "" && lbParsed > 0 ? lbParsed : Lin;
     const CbUse = Math.max(0.1, toN(p.cbFactor) || 1);

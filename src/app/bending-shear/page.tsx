@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import {
   asdStrengthUniformLoadKlf,
+  beamSimplySupportedUniformDeflectionIn,
   lrfdFactoredUniformLoadKlf,
 } from "@/lib/excel-parity";
 import { fmtKipFt, fmtKips } from "@/lib/format/display";
@@ -29,16 +30,19 @@ export default function BendingShearPage() {
   const [designMethod, setDesignMethod] = useState<"LRFD" | "ASD">("LRFD");
   const [material, setMaterial] = useState<SteelMaterialKey>("A36");
   const [shapeName, setShapeName] = useState("W30X90");
-  const [Mu, setMu] = useState("450");
-  const [Vu, setVu] = useState("120");
+  const [Mu, setMu] = useState("0");
+  const [Vu, setVu] = useState("0");
   const [L, setL] = useState("360");
-  const [wLive, setWLive] = useState("0.1");
+  const [wLive, setWLive] = useState("0");
   const [deadLoadKft, setDeadLoadKft] = useState("");
   const [liveLoadKft, setLiveLoadKft] = useState("");
   const [spanFt, setSpanFt] = useState("");
+  /** Analysis — maximum deflection (Excel): span (ft) + live load (klf) only. */
+  const [deflectionSpanFt, setDeflectionSpanFt] = useState("");
+  const [deflectionLiveKlf, setDeflectionLiveKlf] = useState("");
   const [webType, setWebType] = useState<"unstiffened" | "stiffened">("unstiffened");
   const [lateralSpacingA, setLateralSpacingA] = useState("10");
-  const [bracingHeightH, setBracingHeightH] = useState("20");
+  const [bracingHeightH, setBracingHeightH] = useState("");
   const [mode, setMode] = useState<"check" | "design">("check");
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,6 +68,8 @@ export default function BendingShearPage() {
         if (typeof p.deadLoadKft === "string") setDeadLoadKft(p.deadLoadKft);
         if (typeof p.liveLoadKft === "string") setLiveLoadKft(p.liveLoadKft);
         if (typeof p.spanFt === "string") setSpanFt(p.spanFt);
+        if (typeof p.deflectionSpanFt === "string") setDeflectionSpanFt(p.deflectionSpanFt);
+        if (typeof p.deflectionLiveKlf === "string") setDeflectionLiveKlf(p.deflectionLiveKlf);
         if (p.webType === "unstiffened" || p.webType === "stiffened") setWebType(p.webType);
         if (typeof p.lateralSpacingA === "string") setLateralSpacingA(p.lateralSpacingA);
         if (typeof p.bracingHeightH === "string") setBracingHeightH(p.bracingHeightH);
@@ -92,6 +98,8 @@ export default function BendingShearPage() {
           deadLoadKft,
           liveLoadKft,
           spanFt,
+          deflectionSpanFt,
+          deflectionLiveKlf,
           webType,
           lateralSpacingA,
           bracingHeightH,
@@ -118,6 +126,8 @@ export default function BendingShearPage() {
     deadLoadKft,
     liveLoadKft,
     spanFt,
+    deflectionSpanFt,
+    deflectionLiveKlf,
     webType,
     lateralSpacingA,
     bracingHeightH,
@@ -163,30 +173,40 @@ export default function BendingShearPage() {
       designMethod === "LRFD" ? lrfdFactoredUniformLoadKlf(DL, LL) : asdStrengthUniformLoadKlf(DL, LL);
     const MuDer = (wStrengthKlf * Lft * Lft) / 8;
     const VuDer = (wStrengthKlf * Lft) / 2;
-    /** Service load for deflection: D + L (unfactored) → kip/in. */
+    /** Service load for deflection per beam Excel: **live load only** → kip/in = LL/12. */
     const wServiceKipIn = LL / 12;
     const Lin = Lft * 12;
     return { wStrengthKlf, MuDer, VuDer, wServiceKipIn, Lin };
   }, [deadLoadKft, liveLoadKft, spanFt, designMethod]);
 
-  useEffect(() => {
-    if (!derivedFromLoads) return;
-    queueMicrotask(() => {
-      setMu(String(Math.round(derivedFromLoads.MuDer * 1000) / 1000));
-      setVu(String(Math.round(derivedFromLoads.VuDer * 1000) / 1000));
-      setWLive(String(Math.round(derivedFromLoads.wServiceKipIn * 1000000) / 1000000));
-      setL(String(Math.round(derivedFromLoads.Lin)));
-    });
-  }, [derivedFromLoads]);
-
   const out = useMemo(() => {
     if (mode !== "check") return null;
     if (!shape) return null;
-    const Lin = derivedFromLoads?.Lin ?? Number(L);
-    const w = derivedFromLoads?.wServiceKipIn ?? Number(wLive);
-    const muUse = derivedFromLoads?.MuDer ?? Number(Mu);
-    const vuUse = derivedFromLoads?.VuDer ?? Number(Vu);
-    const delta = (5 / 384) * w * (Lin ** 4) / (29000 * (shape.Ix || 1));
+    const spanFtNum = Number(deflectionSpanFt.trim());
+    const llNum = Number(deflectionLiveKlf.trim());
+    const hasDeflectionInputs =
+      Number.isFinite(spanFtNum) &&
+      spanFtNum > 0 &&
+      Number.isFinite(llNum) &&
+      llNum >= 0;
+
+    const Lin = hasDeflectionInputs
+      ? spanFtNum * 12
+      : (() => {
+          const Ln = Number(L);
+          return Number.isFinite(Ln) && Ln > 0 ? Ln : 1;
+        })();
+
+    const w = hasDeflectionInputs ? llNum / 12 : 0;
+    const muUse = Mu.trim() === "" ? 0 : (Number.isFinite(Number(Mu)) ? Number(Mu) : 0);
+    const vuUse = Vu.trim() === "" ? 0 : (Number.isFinite(Number(Vu)) ? Number(Vu) : 0);
+
+    const delta =
+      hasDeflectionInputs && shape.Ix
+        ? beamSimplySupportedUniformDeflectionIn(llNum, spanFtNum, 29000, shape.Ix)
+        : 0;
+    const deflectionAllowable = hasDeflectionInputs ? Lin / 360 : Number.POSITIVE_INFINITY;
+
     const LbUse = Lin;
     const CbUse = 1.14;
     const aInput = Number(lateralSpacingA);
@@ -217,30 +237,57 @@ export default function BendingShearPage() {
       L: Lin,
       wLive: w,
       deflection: delta,
-      deflectionAllowable: Lin / 360,
+      deflectionAllowable,
       Lb: LbUse,
       Cb: CbUse,
       sectionProfile: shape.type === "HSS" ? "HSS" : "W",
     });
-  }, [shape, mat, Mu, Vu, L, wLive, designMethod, derivedFromLoads, lateralSpacingA, bracingHeightH, webType, mode]);
+  }, [
+    shape,
+    mat,
+    Mu,
+    Vu,
+    L,
+    designMethod,
+    deflectionSpanFt,
+    deflectionLiveKlf,
+    lateralSpacingA,
+    bracingHeightH,
+    webType,
+    mode,
+  ]);
 
+  /** DESIGN mode only — requires DL, LL, span; includes beam self-weight in factored w (Excel “checking” row). */
   const suggestion = useMemo(() => {
-    const Lin = derivedFromLoads?.Lin ?? Number(L);
-    const w = derivedFromLoads?.wServiceKipIn ?? Number(wLive);
-    const muUse = derivedFromLoads?.MuDer ?? Number(Mu);
-    const vuUse = derivedFromLoads?.VuDer ?? Number(Vu);
-    if (![Lin, w, muUse, vuUse].every((n) => Number.isFinite(n))) return null;
-    if (!(Lin > 0)) return null;
+    if (mode !== "design") return null;
+    if (!derivedFromLoads) return null;
+    const DL = Number(deadLoadKft);
+    const LL = Number(liveLoadKft);
+    const Lft = Number(spanFt);
+    if (!Number.isFinite(DL) || !Number.isFinite(LL) || !Number.isFinite(Lft) || Lft <= 0) return null;
+
+    const Lin = Lft * 12;
+    const wDeflLiveOnly = LL / 12;
     const LbUse = Lin;
     const CbUse = 1.14;
     const aInput = Number(lateralSpacingA);
-    const hInput = Number(bracingHeightH);
     const aUse = Number.isFinite(aInput) && aInput > 0 ? aInput : 10;
-    const hUse = Number.isFinite(hInput) && hInput > 0 ? hInput : 20;
+
     const candidates = aiscShapes
       .filter((s) => s.type === "W")
       .map((s) => {
-        const delta = (5 / 384) * w * (Lin ** 4) / (29000 * (s.Ix || 1));
+        const swKlf = s.W / 1000;
+        const wStrengthKlf =
+          designMethod === "LRFD"
+            ? lrfdFactoredUniformLoadKlf(DL + swKlf, LL)
+            : asdStrengthUniformLoadKlf(DL + swKlf, LL);
+        const muUse = (wStrengthKlf * Lft * Lft) / 8;
+        const vuUse = (wStrengthKlf * Lft) / 2;
+        const hShape = s.h && s.h > 0 ? s.h : s.d - 2 * s.tf;
+        const hInput = Number(bracingHeightH);
+        const hUse = Number.isFinite(hInput) && hInput > 0 ? hInput : hShape;
+
+        const delta = beamSimplySupportedUniformDeflectionIn(LL, Lft, 29000, s.Ix || 1);
         const check = calculateBendingShearDesign({
           designMethod,
           E: 29000,
@@ -255,7 +302,7 @@ export default function BendingShearPage() {
           tf: s.tf,
           lambdaFlange: s.bf_2tf,
           lambdaWeb: s.h_tw,
-          h: s.h || s.d - 2 * s.tf,
+          h: hShape,
           tw: s.tw,
           a: aUse,
           isStiffened: webType === "stiffened",
@@ -263,7 +310,7 @@ export default function BendingShearPage() {
           Mu: muUse,
           Vu: vuUse,
           L: Lin,
-          wLive: w,
+          wLive: wDeflLiveOnly,
           deflection: delta,
           deflectionAllowable: Lin / 360,
           Lb: LbUse,
@@ -275,7 +322,18 @@ export default function BendingShearPage() {
       .filter((c) => c.check.isSafe)
       .sort((a, b) => a.s.W - b.s.W);
     return candidates[0] ?? null;
-  }, [Mu, Vu, mat, L, wLive, designMethod, derivedFromLoads, lateralSpacingA, bracingHeightH, webType]);
+  }, [
+    mode,
+    derivedFromLoads,
+    deadLoadKft,
+    liveLoadKft,
+    spanFt,
+    mat,
+    designMethod,
+    lateralSpacingA,
+    bracingHeightH,
+    webType,
+  ]);
 
   function scrollTo(id: string) {
     try {
@@ -296,16 +354,18 @@ export default function BendingShearPage() {
     setDesignMethod("LRFD");
     setMaterial("A36");
     setShapeName("W30X90");
-    setMu("450");
-    setVu("120");
+    setMu("0");
+    setVu("0");
     setL("360");
-    setWLive("0.1");
+    setWLive("0");
     setDeadLoadKft("");
     setLiveLoadKft("");
     setSpanFt("");
+    setDeflectionSpanFt("");
+    setDeflectionLiveKlf("");
     setWebType("unstiffened");
     setLateralSpacingA("10");
-    setBracingHeightH("20");
+    setBracingHeightH("");
     setMode("check");
   };
 
@@ -318,8 +378,9 @@ export default function BendingShearPage() {
     mode === "check"
       ? [
           { id: "beam-general", label: "ANALYSIS OF BEAM" },
-          { id: "beam-loads", label: "Design Parameters" },
-          { id: "beam-check", label: "Checking Section's Capacity" },
+          { id: "beam-bending", label: "Bending moment capacity" },
+          { id: "beam-shear", label: "Shear capacity" },
+          { id: "beam-deflection", label: "Maximum deflection" },
           { id: "beam-steps", label: "Steps" },
         ]
       : [
@@ -437,140 +498,199 @@ export default function BendingShearPage() {
               </Card>
             ) : null}
 
-            <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-loads">
-              <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
-                Design Parameters
-                <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  NOTE:  BLUE FONTS INDICATE USERS INPUT!!
-                </span>
-                <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  Units: k/ft, ft
-                </span>
-              </summary>
-              <div className="border-t border-slate-200 p-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Dead Load (kips/ft)" hint="">
-                    <TextInputWithUnit value={deadLoadKft} onChange={setDeadLoadKft} unit="k/ft" placeholder="e.g. 0.8" inputMode="decimal" className={editableInputClass} />
-                  </Field>
-                  <Field label="Live Load (kips/ft)" hint="">
-                    <TextInputWithUnit value={liveLoadKft} onChange={setLiveLoadKft} unit="k/ft" placeholder="e.g. 3.2" inputMode="decimal" className={editableInputClass} />
-                  </Field>
-                  <Field label="Span (ft.)" hint="">
-                    <TextInputWithUnit
-                      value={spanFt}
-                      onChange={(v) => {
-                        setSpanFt(v);
-                        const ft = Number(v);
-                        if (Number.isFinite(ft) && ft > 0) setL(String(ft * 12));
-                      }}
-                      unit="ft"
-                      placeholder="e.g. 30"
-                      className={editableInputClass}
-                    />
-                  </Field>
-                </div>
+            {mode === "design" ? (
+              <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-loads">
+                <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
+                  Design Parameters
+                  <span className="mt-1 block text-xs font-semibold text-slate-600">
+                    NOTE: BLUE FONTS INDICATE USERS INPUT!!
+                  </span>
+                  <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    Units: k/ft, ft
+                  </span>
+                </summary>
+                <div className="border-t border-slate-200 p-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Dead Load (kips/ft)" hint="">
+                      <TextInputWithUnit
+                        value={deadLoadKft}
+                        onChange={setDeadLoadKft}
+                        unit="k/ft"
+                        placeholder="e.g. 0.8"
+                        inputMode="decimal"
+                        className={editableInputClass}
+                      />
+                    </Field>
+                    <Field label="Live Load (kips/ft)" hint="">
+                      <TextInputWithUnit
+                        value={liveLoadKft}
+                        onChange={setLiveLoadKft}
+                        unit="k/ft"
+                        placeholder="e.g. 2"
+                        inputMode="decimal"
+                        className={editableInputClass}
+                      />
+                    </Field>
+                    <Field label="Span (ft.)" hint="">
+                      <TextInputWithUnit
+                        value={spanFt}
+                        onChange={(v) => {
+                          setSpanFt(v);
+                          const ft = Number(v);
+                          if (Number.isFinite(ft) && ft > 0) setL(String(ft * 12));
+                        }}
+                        unit="ft"
+                        placeholder="e.g. 35"
+                        className={editableInputClass}
+                      />
+                    </Field>
+                    <Field label="Type of web (shear)" hint="">
+                      <SelectInput value={webType} onChange={(v) => setWebType(v as "unstiffened" | "stiffened")} className={editableInputClass}>
+                        <option value="unstiffened">Unstiffened</option>
+                        <option value="stiffened">Stiffened</option>
+                      </SelectInput>
+                    </Field>
+                    <Field label="Lateral spacing, a (in.)" hint="">
+                      <TextInputWithUnit value={lateralSpacingA} onChange={setLateralSpacingA} unit="in" inputMode="decimal" className={editableInputClass} />
+                    </Field>
+                    <Field label="Height of bracing, h (in.)" hint="Defaults to section web depth per trial shape when blank.">
+                      <TextInputWithUnit value={bracingHeightH} onChange={setBracingHeightH} unit="in" inputMode="decimal" className={editableInputClass} />
+                    </Field>
+                  </div>
 
-                {derivedFromLoads ? (
-                  <Card className="mt-4 border-[color:var(--brand)]/20 bg-[color:var(--brand)]/5">
-                    <CardBody className="space-y-1 text-sm text-slate-900">
-                      <p className="font-bold">Derived from your loads ({designMethod})</p>
-                      <p className="tabular-nums">
-                        w for strength = {derivedFromLoads.wStrengthKlf.toFixed(3)} k/ft
-                        {designMethod === "LRFD" ? " (LRFD factored)" : " (ASD D + L)"}
-                      </p>
-                      <p className="tabular-nums">
-                        M_u = {derivedFromLoads.MuDer.toFixed(3)} kip·ft · V_u = {derivedFromLoads.VuDer.toFixed(3)} kips
-                      </p>
-                      <p className="tabular-nums">Service w for deflection (L/12) = {derivedFromLoads.wServiceKipIn.toFixed(4)} kip/in</p>
-                    </CardBody>
-                  </Card>
-                ) : null}
-              </div>
-            </details>
-
-            {mode === "check" ? (
-            <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-check">
-              <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
-                {"Checking Section's Capacity"}
-                <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  Bending Moment Capacity · Shear Capacity · Maximum Deflection
-                </span>
-                <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  Units: kip·ft, kips, in
-                </span>
-              </summary>
-              <div className="border-t border-slate-200 p-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                <Field label="M_u" hint="Required flexural strength (kip·ft). Auto-calculated from dead/live/span.">
-                  <TextInputWithUnit value={Mu} onChange={setMu} unit="kip·ft" inputMode="decimal" disabled />
-                </Field>
-                <Field label="V_u" hint="Required shear (kips).">
-                  <TextInputWithUnit value={Vu} onChange={setVu} unit="kips" inputMode="decimal" disabled />
-                </Field>
-                <Field label="Span L" hint="Span in inches." error={invalid(L, 0) ? "Enter a number ≥ 0." : undefined}>
-                  <TextInputWithUnit value={L} onChange={setL} unit="in" inputMode="decimal" disabled />
-                </Field>
-                <Field
-                  label="Type of web"
-                  hint="Based on shear capacity analysis setup in the Excel."
-                >
-                  <SelectInput value={webType} onChange={(v) => setWebType(v as "unstiffened" | "stiffened")} className={editableInputClass}>
-                    <option value="unstiffened">Unstiffened</option>
-                    <option value="stiffened">Stiffened</option>
-                  </SelectInput>
-                </Field>
-                <Field
-                  label="Lateral spacing, a (in.)"
-                  hint=""
-                  error={invalid(lateralSpacingA, 0) ? "Enter a number > 0." : undefined}
-                >
-                  <TextInputWithUnit value={lateralSpacingA} onChange={setLateralSpacingA} unit="in" inputMode="decimal" className={editableInputClass} />
-                </Field>
-                <Field
-                  label="Height of bracing, h (in.)"
-                  hint=""
-                  error={invalid(bracingHeightH, 0) ? "Enter a number > 0." : undefined}
-                >
-                  <TextInputWithUnit value={bracingHeightH} onChange={setBracingHeightH} unit="in" inputMode="decimal" className={editableInputClass} />
-                </Field>
-                {/* Service w is derived from Live Load (kips/ft.) in Design Parameters; Excel UI does not expose kip/in. */}
-                <Field label="Shear case" hint="Auto-detected case from λ and web settings (read-only).">
-                  <TextInput value={out?.beamLimitStates?.shear.cvCase ?? "-"} onChange={() => {}} disabled />
-                </Field>
+                  {derivedFromLoads ? (
+                    <Card className="mt-4 border-[color:var(--brand)]/20 bg-[color:var(--brand)]/5">
+                      <CardBody className="space-y-1 text-sm text-slate-900">
+                        <p className="font-bold">Derived from your loads ({designMethod}) — slab/dead only in strength w</p>
+                        <p className="tabular-nums">
+                          w for strength = {derivedFromLoads.wStrengthKlf.toFixed(3)} k/ft
+                          {designMethod === "LRFD" ? " (LRFD factored; beam weight added per trial section)" : " (ASD D + L incl. trial beam weight)"}
+                        </p>
+                        <p className="tabular-nums">
+                          Trial M_u = {derivedFromLoads.MuDer.toFixed(3)} kip·ft · Trial V_u = {derivedFromLoads.VuDer.toFixed(3)} kips (before beam weight)
+                        </p>
+                        <p className="tabular-nums">
+                          Service w for δ check (live only) = {derivedFromLoads.wServiceKipIn.toFixed(6)} kip/in
+                        </p>
+                      </CardBody>
+                    </Card>
+                  ) : (
+                    <p className="mt-4 text-sm font-semibold text-amber-900">
+                      Enter dead load, live load, and span (all positive numbers) to locate the lightest W-shape. Deflection uses unfactored live load only (Excel convention).
+                    </p>
+                  )}
                 </div>
-                <p className="mt-3 text-xs font-semibold text-slate-600">
-                  Blue fields are user-editable. Non-blue fields are auto-calculated and locked.
-                </p>
-              </div>
-            </details>
+              </details>
             ) : null}
 
             {mode === "check" ? (
-              <Card className="border-slate-200 bg-white">
-                <CardBody>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">
-                    Lightest W-shape suggestion (Analysis mode)
-                  </p>
-                  <p className="mt-1 text-sm text-slate-700">
-                    Uses your current demand set (M, V, L, deflection assumptions) to suggest the lightest W-shape that passes.
-                  </p>
-                  {suggestion ? (
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-xl font-extrabold tracking-tight text-slate-950">{suggestion.s.shape}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-800">
-                        {suggestion.s.W} lb/ft · Zx {suggestion.s.Zx.toFixed(1)} in³
-                      </p>
-                      <p className="mt-2 text-xs font-semibold text-slate-600">
-                        Tip: switch to Design mode if you want this suggestion to be the main workflow.
-                      </p>
+              <>
+                <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-bending">
+                  <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
+                    Bending moment capacity
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">
+                      Uses Structural Member + Steel Type (above). Dead/live loads are not required to obtain φM_n / allowable moment.
+                    </span>
+                  </summary>
+                  <div className="border-t border-slate-200 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field
+                        label="M_u (optional demand)"
+                        hint="Leave 0 or blank to show capacity only. Enter a required moment (kip·ft) to see utilization."
+                      >
+                        <TextInputWithUnit value={Mu} onChange={setMu} unit="kip·ft" inputMode="decimal" className={editableInputClass} placeholder="0" />
+                      </Field>
                     </div>
-                  ) : (
-                    <p className="mt-3 text-sm font-semibold text-rose-700">
-                      No safe W-shape found for the current demand set. Reduce demand or revise inputs.
+                    <p className="mt-3 text-xs font-semibold text-slate-600">
+                      Capacities appear in results → Design strengths / Limit states when you scroll right.
                     </p>
-                  )}
-                </CardBody>
-              </Card>
+                  </div>
+                </details>
+
+                <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-shear">
+                  <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
+                    Shear capacity
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">
+                      W member + steel type + web type + lateral spacing a + height h (Excel shear worksheet).
+                    </span>
+                    <span className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                      Units: kips, in.
+                    </span>
+                  </summary>
+                  <div className="border-t border-slate-200 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field
+                        label="V_u (optional demand)"
+                        hint="Leave 0 or blank for capacity only."
+                      >
+                        <TextInputWithUnit value={Vu} onChange={setVu} unit="kips" inputMode="decimal" className={editableInputClass} placeholder="0" />
+                      </Field>
+                      <Field label="Type of web" hint="">
+                        <SelectInput value={webType} onChange={(v) => setWebType(v as "unstiffened" | "stiffened")} className={editableInputClass}>
+                          <option value="unstiffened">Unstiffened</option>
+                          <option value="stiffened">Stiffened</option>
+                        </SelectInput>
+                      </Field>
+                      <Field
+                        label="Lateral spacing, a (in.)"
+                        hint="For stiffened web (stiffener spacing)."
+                        error={invalid(lateralSpacingA, 0) ? "Enter a number > 0." : undefined}
+                      >
+                        <TextInputWithUnit value={lateralSpacingA} onChange={setLateralSpacingA} unit="in" inputMode="decimal" className={editableInputClass} />
+                      </Field>
+                      <Field
+                        label="Height of bracing, h (in.)"
+                        hint="Panel depth for a/h and k_v when stiffened; defaults to section clear web depth."
+                        error={bracingHeightH.trim() !== "" && invalid(bracingHeightH, 0) ? "Enter a number > 0." : undefined}
+                      >
+                        <TextInputWithUnit value={bracingHeightH} onChange={setBracingHeightH} unit="in" inputMode="decimal" className={editableInputClass} />
+                      </Field>
+                      <Field label="Shear case (auto)" hint="">
+                        <TextInput value={out?.beamLimitStates?.shear.cvCase ?? "-"} onChange={() => {}} disabled />
+                      </Field>
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-slate-600">
+                      Blue fields are user-editable.
+                    </p>
+                  </div>
+                </details>
+
+                <details open className="rounded-2xl border border-slate-200 bg-white" id="beam-deflection">
+                  <summary className="cursor-pointer px-5 py-4 text-sm font-extrabold tracking-tight text-slate-950">
+                    Maximum deflection
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">
+                      Structural member + span + live load only (simply supported; δ matches workbook Q14 — LL in klf, span in ft; allowable L/360).
+                    </span>
+                  </summary>
+                  <div className="border-t border-slate-200 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Span (ft.)" hint="">
+                        <TextInputWithUnit
+                          value={deflectionSpanFt}
+                          onChange={setDeflectionSpanFt}
+                          unit="ft"
+                          placeholder="e.g. 35"
+                          inputMode="decimal"
+                          className={editableInputClass}
+                        />
+                      </Field>
+                      <Field label="Live Load (kips/ft)" hint="">
+                        <TextInputWithUnit
+                          value={deflectionLiveKlf}
+                          onChange={setDeflectionLiveKlf}
+                          unit="k/ft"
+                          placeholder="e.g. 1"
+                          inputMode="decimal"
+                          className={editableInputClass}
+                        />
+                      </Field>
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-slate-600">
+                      Leave blank to skip the deflection limit state in the summary (no δ check).
+                    </p>
+                  </div>
+                </details>
+              </>
             ) : null}
 
             {mode === "design" ? (
@@ -632,7 +752,9 @@ export default function BendingShearPage() {
                       if (mode === "design") {
                         const lines: string[] = [
                           `Method: ${designMethod} · Material: ${mat.key} · Mode: Design`,
-                          `Loads: Mu ${Mu} kip-ft · Vu ${Vu} kips · L ${L} in`,
+                          derivedFromLoads
+                            ? `Loads: DL ${deadLoadKft} klf · LL ${liveLoadKft} klf · span ${spanFt} ft (trial sections include beam weight)`
+                            : `Loads: enter DL, LL, span in Design Parameters`,
                         ];
                         if (suggestion) {
                           lines.push(
@@ -670,9 +792,9 @@ export default function BendingShearPage() {
                         "Beam — Design",
                         `Method: ${designMethod}`,
                         `Material: ${mat.key}`,
-                        `Mu: ${Mu} kip-ft`,
-                        `Vu: ${Vu} kips`,
-                        `L: ${L} in`,
+                        derivedFromLoads
+                          ? `DL ${deadLoadKft} klf · LL ${liveLoadKft} klf · span ${spanFt} ft`
+                          : "Loads: (enter DL, LL, span)",
                       ];
                       if (suggestion) {
                         lines.push(
@@ -707,10 +829,27 @@ export default function BendingShearPage() {
                   }}
                   onGoResults={() => scrollTo(resultAnchorId)}
                   onGoSteps={() => scrollTo("beam-steps")}
-                  json={{
+                    json={{
                     data: {
                       result: mode === "design" ? suggestion?.check ?? null : out,
-                      inputs: { material, shapeName, Mu, Vu, L, wLive, designMethod, webType, lateralSpacingA, bracingHeightH, mode },
+                      inputs: {
+                        material,
+                        shapeName,
+                        Mu,
+                        Vu,
+                        L,
+                        wLive,
+                        deflectionSpanFt,
+                        deflectionLiveKlf,
+                        deadLoadKft,
+                        liveLoadKft,
+                        spanFt,
+                        designMethod,
+                        webType,
+                        lateralSpacingA,
+                        bracingHeightH,
+                        mode,
+                      },
                     },
                   }}
                   onReset={resetInputs}
@@ -724,6 +863,28 @@ export default function BendingShearPage() {
                   </Card>
                 ) : null}
                 <div id="results">
+                {mode === "design" && suggestion?.check?.beamLimitStates ? (
+                  <ResultHero
+                    status={suggestion.check.isSafe ? "safe" : "unsafe"}
+                    governing={suggestion.check.beamLimitStates.governing}
+                    capacityLabel="Max utilization (trial section)"
+                    capacity={`${(
+                      Math.max(
+                        suggestion.check.beamLimitStates.bending.ratio,
+                        suggestion.check.beamLimitStates.shear.ratio,
+                        suggestion.check.beamLimitStates.deflection.ratio,
+                      ) * 100
+                    ).toFixed(1)}%`}
+                    demandLabel="Lightest W"
+                    demand={suggestion.s.shape}
+                    utilization={Math.max(
+                      suggestion.check.beamLimitStates.bending.ratio,
+                      suggestion.check.beamLimitStates.shear.ratio,
+                      suggestion.check.beamLimitStates.deflection.ratio,
+                    )}
+                  />
+                ) : null}
+
                 {mode === "check" && out ? (
                   <ResultHero
                     status={out.governingCase === "geometry_error" ? "invalid" : out.isSafe ? "safe" : "unsafe"}
@@ -757,6 +918,37 @@ export default function BendingShearPage() {
                 ) : null}
                 </div>
 
+                {mode === "design" && suggestion?.check?.beamLimitStates ? (
+                  <Card>
+                    <CardBody className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Limit states — {suggestion.s.shape} (strength w includes beam weight)
+                      </p>
+                      <LimitRow
+                        title="Bending"
+                        demand={suggestion.check.beamLimitStates.bending.demand}
+                        capacity={suggestion.check.beamLimitStates.bending.capacity}
+                        ratio={suggestion.check.beamLimitStates.bending.ratio}
+                        unit={suggestion.check.beamLimitStates.bending.unit}
+                      />
+                      <LimitRow
+                        title={`Shear (${suggestion.check.beamLimitStates.shear.cvCase}, C_v = ${suggestion.check.beamLimitStates.shear.cv.toFixed(4)})`}
+                        demand={suggestion.check.beamLimitStates.shear.demand}
+                        capacity={suggestion.check.beamLimitStates.shear.capacity}
+                        ratio={suggestion.check.beamLimitStates.shear.ratio}
+                        unit={suggestion.check.beamLimitStates.shear.unit}
+                      />
+                      <LimitRow
+                        title="Deflection (live load · L/360)"
+                        demand={suggestion.check.beamLimitStates.deflection.demand}
+                        capacity={suggestion.check.beamLimitStates.deflection.capacity}
+                        ratio={suggestion.check.beamLimitStates.deflection.ratio}
+                        unit={suggestion.check.beamLimitStates.deflection.unit}
+                      />
+                    </CardBody>
+                  </Card>
+                ) : null}
+
                 {mode === "check" && out?.beamLimitStates && out.governingCase !== "geometry_error" ? (
                   <Card>
                     <CardBody className="space-y-3">
@@ -778,16 +970,34 @@ export default function BendingShearPage() {
                         unit={out.beamLimitStates.shear.unit}
                       />
                       <LimitRow
-                        title={
-                          deadLoadKft.trim() && liveLoadKft.trim() && spanFt.trim()
-                            ? "Deflection (service L only)"
-                            : "Deflection (service w)"
-                        }
+                        title="Deflection (live load · L/360)"
                         demand={out.beamLimitStates.deflection.demand}
                         capacity={out.beamLimitStates.deflection.capacity}
                         ratio={out.beamLimitStates.deflection.ratio}
                         unit={out.beamLimitStates.deflection.unit}
                       />
+                    </CardBody>
+                  </Card>
+                ) : null}
+
+                {mode === "design" && suggestion?.check?.results ? (
+                  <Card>
+                    <CardBody>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Design strengths — {suggestion.s.shape}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {Object.entries(suggestion.check.results).map(([key, value]) => (
+                          <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-xs font-semibold text-slate-700">{value.name}</span>
+                              <span className="font-semibold tabular-nums text-slate-950">
+                                {value.unit === "kip-ft" ? fmtKipFt(value.phiPn) : fmtKips(value.phiPn)} {value.unit}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardBody>
                   </Card>
                 ) : null}
@@ -825,6 +1035,26 @@ export default function BendingShearPage() {
         saving={saving}
         savedAt={savedAt}
         copyText={() => {
+          if (mode === "design") {
+            const lines = [
+              "Beam — Design",
+              `Method: ${designMethod}`,
+              `Material: ${mat.key}`,
+              derivedFromLoads
+                ? `DL ${deadLoadKft} klf · LL ${liveLoadKft} klf · span ${spanFt} ft`
+                : "Loads: (enter DL, LL, span)",
+            ];
+            if (suggestion) {
+              lines.push(
+                `Suggested: ${suggestion.s.shape}`,
+                `Weight: ${suggestion.s.W.toFixed(1)} plf`,
+                `Zx: ${suggestion.s.Zx.toFixed(1)} in^3`,
+              );
+            } else {
+              lines.push("Suggested: none (no safe W-shape found)");
+            }
+            return lines.join("\n");
+          }
           if (!out) return "Beam — No results";
           const lines = [
             "Beam",
@@ -847,24 +1077,51 @@ export default function BendingShearPage() {
         }}
         onGoResults={() => scrollTo("results")}
         onGoSteps={() => scrollTo("beam-steps")}
-        json={
-          out
-            ? {
-                data: {
-                  result: out,
-                  inputs: { material, shapeName, Mu, Vu, L, wLive, designMethod, webType, lateralSpacingA, bracingHeightH },
-                },
-              }
-            : undefined
-        }
+        json={{
+          data: {
+            result: mode === "design" ? suggestion?.check ?? null : out,
+            inputs: {
+              material,
+              shapeName,
+              Mu,
+              Vu,
+              L,
+              wLive,
+              deflectionSpanFt,
+              deflectionLiveKlf,
+              deadLoadKft,
+              liveLoadKft,
+              spanFt,
+              designMethod,
+              webType,
+              lateralSpacingA,
+              bracingHeightH,
+              mode,
+            },
+          },
+        }}
         compare={{
           storageKey: "ssc:compare:beam",
           getCurrent: () => {
+            if (mode === "design") {
+              const lines: string[] = [
+                `Method: ${designMethod} · Material: ${mat.key} · Mode: Design`,
+                derivedFromLoads
+                  ? `Loads: DL ${deadLoadKft} klf · LL ${liveLoadKft} klf · span ${spanFt} ft`
+                  : `Loads: enter DL, LL, span`,
+              ];
+              if (suggestion) {
+                lines.push(`Suggested: ${suggestion.s.shape}`, `Weight: ${suggestion.s.W.toFixed(1)} plf`);
+              } else {
+                lines.push("Suggested: none");
+              }
+              return { title: "Beam — Design", lines };
+            }
             const gov = out?.beamLimitStates?.governing ?? out?.governingCase ?? "—";
             const lines: string[] = [
               `Method: ${designMethod} · Material: ${mat.key} · Mode: ${mode}`,
               `Shape: ${shapeName}`,
-              `Mu: ${Mu} kip-ft · Vu: ${Vu} kips · L: ${L} in`,
+              `Mu: ${Mu} kip-ft · Vu: ${Vu} kips`,
               `Governing: ${String(gov)}`,
             ];
             if (out?.beamLimitStates) {
@@ -888,6 +1145,11 @@ export default function BendingShearPage() {
   );
 }
 
+function fmtInches(n: number, decimals = 5): string {
+  if (!Number.isFinite(n)) return "—";
+  return n.toFixed(decimals);
+}
+
 function LimitRow(props: {
   title: string;
   demand: number;
@@ -895,13 +1157,16 @@ function LimitRow(props: {
   ratio: number;
   unit: string;
 }) {
+  const fmtDem =
+    props.unit === "kip-ft" ? fmtKipFt(props.demand) : props.unit === "in" ? fmtInches(props.demand) : fmtKips(props.demand);
+  const fmtCap =
+    props.unit === "kip-ft" ? fmtKipFt(props.capacity) : props.unit === "in" ? fmtInches(props.capacity) : fmtKips(props.capacity);
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <p className="text-sm font-semibold text-slate-900">{props.title}</p>
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-slate-700">
         <span className="tabular-nums">
-          Demand {(props.unit === "kip-ft" ? fmtKipFt(props.demand) : fmtKips(props.demand))} / Capacity{" "}
-          {(props.unit === "kip-ft" ? fmtKipFt(props.capacity) : fmtKips(props.capacity))} {props.unit}
+          Demand {fmtDem} / Capacity {fmtCap} {props.unit}
         </span>
         <span className="font-semibold tabular-nums text-slate-900">{(props.ratio * 100).toFixed(1)}%</span>
       </div>

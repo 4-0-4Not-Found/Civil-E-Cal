@@ -34,3 +34,23 @@ export function roundLikeExcel(n: number, decimals = 3): number {
   const f = 10 ** decimals;
   return Math.round(n * f) / f;
 }
+
+/**
+ * Midspan deflection (inches), simply supported, uniform load — **Steel Design Programs** sheet
+ * “Bending, Shear, and Deflection”, cell **Q14** expansion:
+ * `(5/384)*R9*R8^4/((29000*R10)*(12^2)*(1/12)^3)` with `R9` = w (kip/ft), `R8` = span (ft), `R10` = I_x (in⁴).
+ *
+ * Matches spreadsheet numbers labeled “ft” when divided by 12 (same magnitude as δ shown there).
+ */
+export function beamSimplySupportedUniformDeflectionIn(
+  wLiveKlf: number,
+  spanFt: number,
+  EKsi: number,
+  ixIn4: number,
+): number {
+  if (!Number.isFinite(wLiveKlf) || !Number.isFinite(spanFt) || !Number.isFinite(EKsi) || !Number.isFinite(ixIn4)) {
+    return 0;
+  }
+  if (!(spanFt > 0) || !(ixIn4 > 0) || !(EKsi > 0)) return 0;
+  return ((5 / 384) * wLiveKlf * spanFt ** 4 * 144) / (EKsi * ixIn4);
+}

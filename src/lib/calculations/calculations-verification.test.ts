@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import shapes from "@/data/aisc-shapes-v16.json";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
+import { beamSimplySupportedUniformDeflectionIn } from "@/lib/excel-parity";
 import { calculateCompressionDesign } from "@/lib/calculations/compression";
 import { calculateTensionDesign } from "@/lib/calculations/tension";
 import { staggeredNetWidthInches } from "@/lib/calculations/net-area";
@@ -169,8 +170,10 @@ describe("Bending (calculateBendingShearDesign) — fields: designMethod, materi
   const w24 = pickShape("W24X131");
   const hBeam = w24.h && w24.h > 0 ? w24.h : w24.d - 2 * w24.tf;
   const Lin = 30 * 12;
-  const wService = (0.8 + 3.2) / 12;
-  const delta = (5 / 384) * wService * Lin ** 4 / (E * (w24.Ix || 1));
+  /** Course beam Excel Q14-style δ (live load only, span in ft). */
+  const LLonly = 3.2;
+  const spanFt = 30;
+  const delta = beamSimplySupportedUniformDeflectionIn(LLonly, spanFt, E, w24.Ix || 1);
   const wStrLrfd = Math.max(1.4 * 0.8, 1.2 * 0.8 + 1.6 * 3.2);
   const MuDer = (wStrLrfd * 30 * 30) / 8;
   const VuDer = (wStrLrfd * 30) / 2;
@@ -200,15 +203,16 @@ describe("Bending (calculateBendingShearDesign) — fields: designMethod, materi
       Mu: MuDer,
       Vu: VuDer,
       L: Lin,
-      wLive: wService,
+      wLive: LLonly / 12,
       deflection: delta,
       deflectionAllowable: Lin / 360,
       Lb: Lin,
       Cb: 1.14,
     });
     expect(b.results.bending.phiPn).toBeCloseTo(1032.333, 2);
-    expect(b.results.shear.phiPn).toBeCloseTo(409.827, 2);
-    expect(delta).toBeCloseTo(0.625, 2);
+    /** φV_n — A_w = d × t_w (rolled W). */
+    expect(b.results.shear.phiPn).toBeCloseTo(444.675, 2);
+    expect(delta).toBeCloseTo(0.0417, 3);
     expect(b.beamLimitStates?.governing).toBe("bending");
     expect(b.isSafe).toBe(true);
   });
@@ -240,14 +244,14 @@ describe("Bending (calculateBendingShearDesign) — fields: designMethod, materi
       Mu: MuAsd,
       Vu: VuAsd,
       L: Lin,
-      wLive: wService,
+      wLive: LLonly / 12,
       deflection: delta,
       deflectionAllowable: Lin / 360,
       Lb: Lin,
       Cb: 1.14,
     });
     expect(b.results.bending.phiPn).toBeCloseTo(686.848, 2);
-    expect(b.results.shear.phiPn).toBeCloseTo(273.218, 2);
+    expect(b.results.shear.phiPn).toBeCloseTo(296.45, 2);
     expect(b.beamLimitStates?.governing).toBe("bending");
     expect(b.isSafe).toBe(true);
   });

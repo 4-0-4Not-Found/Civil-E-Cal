@@ -202,15 +202,27 @@ export function calculateBendingShearDesign(input: BendingInput): CalculationOut
 
   const phiMn = input.designMethod === "LRFD" ? 0.9 * mn_ft : mn_ft / 1.67;
 
-  /** HSS: shear carried by two side webs (G5-style area); W-shape: single web panel. */
-  const Aw = profile === "HSS" ? 2 * input.h * input.tw : input.h * input.tw;
+  /**
+   * Shear area A_w: rolled W-shapes use **d × t_w** (matches course Excel / AISC Manual tables).
+   * HSS: two webs → **2 h t_w** (approximate clear wall depth × t_w per web).
+   */
+  const Aw =
+    profile === "HSS" ? 2 * Math.max(input.h, 1e-9) * input.tw : Math.max(input.d, 1e-9) * input.tw;
   if (Aw <= 0) {
-    return beamGeometryError(input, "Shear area A_w = h × t_w must be positive.");
+    return beamGeometryError(input, "Shear area A_w must be positive.");
   }
 
+  /** Panel depth for stiffener spacing ratio (Excel “height of bracing h”). */
   const shearPanelH = Number.isFinite(input.shearPanelH) && (input.shearPanelH ?? 0) > 0 ? (input.shearPanelH as number) : input.h;
-  const panelRatio = shearPanelH / Math.max(input.a, 1e-9);
-  const kv = input.isStiffened ? (panelRatio > 3 ? 5 : 5 + 5 / panelRatio ** 2) : 5;
+  /** AISC 360-16 G2.2(b): interior stiffened panel k_v = 5 + 5/(a/h)² when a/h ≤ 3; otherwise k_v ≈ 5. */
+  let kv = 5;
+  if (input.isStiffened && profile !== "HSS") {
+    const hPan = Math.max(shearPanelH, 1e-9);
+    const aPan = Math.max(input.a, 1e-9);
+    const aOverH = aPan / hPan;
+    if (aOverH > 3) kv = 5;
+    else kv = 5 + 5 / (aOverH * aOverH);
+  }
   const lambdaV1 = 2.24 * Math.sqrt(E / Fy);
   const lambdaV2 = 1.1 * Math.sqrt((kv * E) / Fy);
   const lambdaV3 = 1.37 * Math.sqrt((kv * E) / Fy);

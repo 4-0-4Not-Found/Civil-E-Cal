@@ -7,6 +7,7 @@ import { calculateBendingShearDesign } from "../src/lib/calculations/bending";
 import { calculateCompressionDesign } from "../src/lib/calculations/compression";
 import { calculateTensionDesign } from "../src/lib/calculations/tension";
 import { staggeredNetWidthInches } from "../src/lib/calculations/net-area";
+import { beamSimplySupportedUniformDeflectionIn } from "../src/lib/excel-parity";
 import type { AiscShape } from "../src/lib/aisc/types";
 
 const round = (n: number, d: number) => Number(n.toFixed(d));
@@ -128,15 +129,29 @@ console.log(
 
 // --- BENDING ---
 const hBeam = w24.h && w24.h > 0 ? w24.h : w24.d - 2 * w24.tf;
-const wService = (0.8 + 3.2) / 12;
+
 const Lin = 30 * 12;
-const delta = (5 / 384) * wService * Lin ** 4 / (E * (w24.Ix || 1));
+const spanFt = 30;
+const LLonly = 3.2;
+const delta = beamSimplySupportedUniformDeflectionIn(LLonly, spanFt, E, w24.Ix || 1);
 const wStrLrfd = Math.max(1.4 * 0.8, 1.2 * 0.8 + 1.6 * 3.2);
 const MuDer = (wStrLrfd * 30 * 30) / 8;
 const VuDer = (wStrLrfd * 30) / 2;
 
 console.log("\n--- B1 LRFD derived loads D=0.8 L=3.2 klf span=30 ft W24X131 ---");
-console.log(JSON.stringify({ wStrengthKlf: round(wStrLrfd, 4), MuDer: round(MuDer, 3), VuDer: round(VuDer, 3), wServiceKipIn: round(wService, 6) }, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      wStrengthKlf: round(wStrLrfd, 4),
+      MuDer: round(MuDer, 3),
+      VuDer: round(VuDer, 3),
+      wLiveKlf_forDelta: LLonly,
+      deflection_in_Q14_style: round(delta, 6),
+    },
+    null,
+    2,
+  ),
+);
 
 const b1 = calculateBendingShearDesign({
   designMethod: "LRFD",
@@ -159,7 +174,7 @@ const b1 = calculateBendingShearDesign({
   Mu: MuDer,
   Vu: VuDer,
   L: Lin,
-  wLive: wService,
+  wLive: LLonly / 12,
   deflection: delta,
   deflectionAllowable: Lin / 360,
   Lb: Lin,
@@ -205,7 +220,7 @@ const b2 = calculateBendingShearDesign({
   Mu: MuAsd,
   Vu: VuAsd,
   L: Lin,
-  wLive: wService,
+  wLive: LLonly / 12,
   deflection: delta,
   deflectionAllowable: Lin / 360,
   Lb: Lin,
