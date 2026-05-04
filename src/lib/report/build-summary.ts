@@ -1,5 +1,5 @@
 import { aiscShapes } from "@/lib/aisc/data";
-import { beamSimplySupportedUniformDeflectionIn } from "@/lib/excel-parity";
+import { beamSimplySupportedUniformDeflectionFt } from "@/lib/excel-parity";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import { calculateCompressionDesign } from "@/lib/calculations/compression";
 import { calculateTensionDesign } from "@/lib/calculations/tension";
@@ -135,8 +135,8 @@ export function summarizeBending(p: Record<string, string> | null): BendingSumma
     }
     const hBeam = shape.h && shape.h > 0 ? shape.h : shape.d - 2 * shape.tf;
     const delta = derivedBeamLoads
-      ? beamSimplySupportedUniformDeflectionIn(LL, Lft, 29000, shape.Ix || 1)
-      : (5 / 384) * w * Lin ** 4 / (29000 * (shape.Ix || 1));
+      ? beamSimplySupportedUniformDeflectionFt(LL, Lft, 29000, shape.Ix || 1)
+      : ((5 / 384) * w * Lin ** 4 / (29000 * (shape.Ix || 1))) / 12;
     const lbParsed = toN(p.unbracedLbIn);
     const LbUse = p.unbracedLbIn?.trim() !== "" && lbParsed > 0 ? lbParsed : Lin;
     const CbUse = Math.max(0.1, toN(p.cbFactor) || 1);
@@ -163,10 +163,11 @@ export function summarizeBending(p: Record<string, string> | null): BendingSumma
       L: Lin,
       wLive: w,
       deflection: delta,
-      deflectionAllowable: Lin / 360,
+      deflectionAllowable: derivedBeamLoads ? Lft / 360 : Lin / (360 * 12),
       Lb: LbUse,
       Cb: CbUse,
       sectionProfile: mode === "design" ? "W" : shape.type === "HSS" ? "HSS" : "W",
+      excelParityMode: true,
     });
     return {
       module: "bending",

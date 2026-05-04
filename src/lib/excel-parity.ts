@@ -36,13 +36,13 @@ export function roundLikeExcel(n: number, decimals = 3): number {
 }
 
 /**
- * Midspan deflection (inches), simply supported, uniform load — **Steel Design Programs** sheet
+ * Midspan deflection (feet), simply supported, uniform load — **Steel Design Programs** sheet
  * “Bending, Shear, and Deflection”, cell **Q14** expansion:
  * `(5/384)*R9*R8^4/((29000*R10)*(12^2)*(1/12)^3)` with `R9` = w (kip/ft), `R8` = span (ft), `R10` = I_x (in⁴).
  *
- * Matches spreadsheet numbers labeled “ft” when divided by 12 (same magnitude as δ shown there).
+ * Matches spreadsheet numbers directly (worksheet deflection values shown in ft).
  */
-export function beamSimplySupportedUniformDeflectionIn(
+export function beamSimplySupportedUniformDeflectionFt(
   wLiveKlf: number,
   spanFt: number,
   EKsi: number,
@@ -52,5 +52,5 @@ export function beamSimplySupportedUniformDeflectionIn(
     return 0;
   }
   if (!(spanFt > 0) || !(ixIn4 > 0) || !(EKsi > 0)) return 0;
-  return ((5 / 384) * wLiveKlf * spanFt ** 4 * 144) / (EKsi * ixIn4);
+  return ((5 / 384) * wLiveKlf * spanFt ** 4 * 12) / (EKsi * ixIn4);
 }

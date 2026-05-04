@@ -36,6 +36,8 @@ export type BendingInput = {
   Lb: number;
   /** AISC F1: lateral-torsional buckling modification factor (e.g. 1.0 uniform moment, 1.14 uniform load SS). */
   Cb: number;
+  /** Workbook parity mode: use local-buckling flexural equation (no LTB reduction in main bending block). */
+  excelParityMode?: boolean;
   /**
    * Rolled W-shape (default) vs rectangular HSS strong-axis — HSS uses wall slenderness limits
    * from Table B4.1b (HSS), thin-walled box J, and shear area on two webs (approximate F7/G5-style checks).
@@ -67,7 +69,7 @@ function beamGeometryError(input: BendingInput, message: string): CalculationOut
       demand: input.deflection,
       capacity: input.deflectionAllowable,
       ratio: safeRatio(input.deflection, input.deflectionAllowable),
-      unit: "in",
+      unit: "ft",
     },
     governing: "bending",
   };
@@ -197,7 +199,7 @@ export function calculateBendingShearDesign(input: BendingInput): CalculationOut
     MnLtb_kipin = Math.min(Mp_kipin, Fcr_ltb * input.Sx);
   }
 
-  const Mn_kipin = Math.min(MnFlb_kipin, MnLtb_kipin);
+  const Mn_kipin = input.excelParityMode ? MnFlb_kipin : Math.min(MnFlb_kipin, MnLtb_kipin);
   const mn_ft = Mn_kipin / 12;
 
   const phiMn = input.designMethod === "LRFD" ? 0.9 * mn_ft : mn_ft / 1.67;
@@ -269,7 +271,7 @@ export function calculateBendingShearDesign(input: BendingInput): CalculationOut
       demand: input.deflection,
       capacity: input.deflectionAllowable,
       ratio: ratioDeflection,
-      unit: "in" as const,
+      unit: "ft" as const,
     },
     governing: (() => {
       const pairs: Array<["bending" | "shear" | "deflection", number]> = [
@@ -346,7 +348,12 @@ export function calculateBendingShearDesign(input: BendingInput): CalculationOut
     { id: "b3", label: "k_v", formula: "AISC G2", value: kv, unit: "-" },
     { id: "b4", label: "C_v", formula: "AISC G2", value: Cv, unit: "-" },
     { id: "b5", label: "Shear strength φV_n / V_n/Ω", formula: "§G2: φ=1.0 LRFD, Ω=1.5 ASD", value: phiVn, unit: "kips" },
-    { id: "b6", label: "Deflection", formula: "δ ≤ allowable (live)", value: `${input.deflection} in ≤ ${input.deflectionAllowable} in` },
+    {
+      id: "b6",
+      label: "Deflection",
+      formula: "δ ≤ allowable (live)",
+      value: `${input.deflection} ft ≤ ${input.deflectionAllowable} ft`,
+    },
   ];
 
   return {

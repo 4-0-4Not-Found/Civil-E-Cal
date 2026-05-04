@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { calculateBendingShearDesign } from "@/lib/calculations/bending";
 import {
   asdStrengthUniformLoadKlf,
-  beamSimplySupportedUniformDeflectionIn,
+  beamSimplySupportedUniformDeflectionFt,
   lrfdFactoredUniformLoadKlf,
 } from "@/lib/excel-parity";
 import { fmtKipFt, fmtKips } from "@/lib/format/display";
@@ -43,6 +43,8 @@ export default function BendingShearPage() {
   const [webType, setWebType] = useState<"unstiffened" | "stiffened">("unstiffened");
   const [lateralSpacingA, setLateralSpacingA] = useState("10");
   const [bracingHeightH, setBracingHeightH] = useState("");
+  /** Workbook design parity: design shear capacity uses a separate reference member (J5 block). */
+  const [designShearShapeName, setDesignShearShapeName] = useState("W21X44");
   const [mode, setMode] = useState<"check" | "design">("check");
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,6 +75,7 @@ export default function BendingShearPage() {
         if (p.webType === "unstiffened" || p.webType === "stiffened") setWebType(p.webType);
         if (typeof p.lateralSpacingA === "string") setLateralSpacingA(p.lateralSpacingA);
         if (typeof p.bracingHeightH === "string") setBracingHeightH(p.bracingHeightH);
+        if (typeof p.designShearShapeName === "string") setDesignShearShapeName(p.designShearShapeName);
         if (p.mode === "check" || p.mode === "design") setMode(p.mode);
       });
     } catch {
@@ -103,6 +106,7 @@ export default function BendingShearPage() {
           webType,
           lateralSpacingA,
           bracingHeightH,
+          designShearShapeName,
           mode,
         }),
       );
@@ -131,6 +135,7 @@ export default function BendingShearPage() {
     webType,
     lateralSpacingA,
     bracingHeightH,
+    designShearShapeName,
     mode,
   ]);
 
@@ -149,6 +154,7 @@ export default function BendingShearPage() {
         : aiscShapes.filter((s) => s.type === "W" || s.type === "HSS"),
     [mode],
   );
+  const designShearShapeOptions = useMemo(() => aiscShapes.filter((s) => s.type === "W"), []);
 
   useEffect(() => {
     if (mode !== "design") return;
@@ -173,8 +179,8 @@ export default function BendingShearPage() {
       designMethod === "LRFD" ? lrfdFactoredUniformLoadKlf(DL, LL) : asdStrengthUniformLoadKlf(DL, LL);
     const MuDer = (wStrengthKlf * Lft * Lft) / 8;
     const VuDer = (wStrengthKlf * Lft) / 2;
-    /** Service load for deflection per beam Excel: **live load only** → kip/in = LL/12. */
-    const wServiceKipIn = LL / 12;
+    /** Service deflection input per workbook: live load in k/ft (Q14). */
+    const wServiceKipIn = LL;
     const Lin = Lft * 12;
     return { wStrengthKlf, MuDer, VuDer, wServiceKipIn, Lin };
   }, [deadLoadKft, liveLoadKft, spanFt, designMethod]);
@@ -190,22 +196,19 @@ export default function BendingShearPage() {
       Number.isFinite(llNum) &&
       llNum >= 0;
 
-    const Lin = hasDeflectionInputs
-      ? spanFtNum * 12
-      : (() => {
-          const Ln = Number(L);
-          return Number.isFinite(Ln) && Ln > 0 ? Ln : 1;
-        })();
-
-    const w = hasDeflectionInputs ? llNum / 12 : 0;
+    const Lin = hasDeflectionInputs ? spanFtNum * 12 : (() => {
+      const Ln = Number(L);
+      return Number.isFinite(Ln) && Ln > 0 ? Ln : 1;
+    })();
+    const w = hasDeflectionInputs ? llNum : 0;
     const muUse = Mu.trim() === "" ? 0 : (Number.isFinite(Number(Mu)) ? Number(Mu) : 0);
     const vuUse = Vu.trim() === "" ? 0 : (Number.isFinite(Number(Vu)) ? Number(Vu) : 0);
 
     const delta =
       hasDeflectionInputs && shape.Ix
-        ? beamSimplySupportedUniformDeflectionIn(llNum, spanFtNum, 29000, shape.Ix)
+        ? beamSimplySupportedUniformDeflectionFt(llNum, spanFtNum, 29000, shape.Ix)
         : 0;
-    const deflectionAllowable = hasDeflectionInputs ? Lin / 360 : Number.POSITIVE_INFINITY;
+    const deflectionAllowable = hasDeflectionInputs ? spanFtNum / 360 : Number.POSITIVE_INFINITY;
 
     const LbUse = Lin;
     const CbUse = 1.14;
@@ -241,6 +244,7 @@ export default function BendingShearPage() {
       Lb: LbUse,
       Cb: CbUse,
       sectionProfile: shape.type === "HSS" ? "HSS" : "W",
+      excelParityMode: true,
     });
   }, [
     shape,
@@ -257,7 +261,7 @@ export default function BendingShearPage() {
     mode,
   ]);
 
-  /** DESIGN mode only — requires DL, LL, span; includes beam self-weight in factored w (Excel “checking” row). */
+  /** DESIGN mode only — workbook parity: pick by required Zx and required Ix, then run final check with self-weight. */
   const suggestion = useMemo(() => {
     if (mode !== "design") return null;
     if (!derivedFromLoads) return null;
@@ -267,61 +271,139 @@ export default function BendingShearPage() {
     if (!Number.isFinite(DL) || !Number.isFinite(LL) || !Number.isFinite(Lft) || Lft <= 0) return null;
 
     const Lin = Lft * 12;
-    const wDeflLiveOnly = LL / 12;
     const LbUse = Lin;
     const CbUse = 1.14;
     const aInput = Number(lateralSpacingA);
     const aUse = Number.isFinite(aInput) && aInput > 0 ? aInput : 10;
-
-    const candidates = aiscShapes
-      .filter((s) => s.type === "W")
-      .map((s) => {
-        const swKlf = s.W / 1000;
-        const wStrengthKlf =
-          designMethod === "LRFD"
-            ? lrfdFactoredUniformLoadKlf(DL + swKlf, LL)
-            : asdStrengthUniformLoadKlf(DL + swKlf, LL);
-        const muUse = (wStrengthKlf * Lft * Lft) / 8;
-        const vuUse = (wStrengthKlf * Lft) / 2;
-        const hShape = s.h && s.h > 0 ? s.h : s.d - 2 * s.tf;
-        const hInput = Number(bracingHeightH);
-        const hUse = Number.isFinite(hInput) && hInput > 0 ? hInput : hShape;
-
-        const delta = beamSimplySupportedUniformDeflectionIn(LL, Lft, 29000, s.Ix || 1);
-        const check = calculateBendingShearDesign({
-          designMethod,
-          E: 29000,
-          Fy: mat.Fy,
-          Zx: s.Zx,
-          Sx: s.Sx,
-          Ix: s.Ix,
-          Iy: s.Iy,
-          ry: s.ry,
-          d: s.d,
-          bf: s.bf,
-          tf: s.tf,
-          lambdaFlange: s.bf_2tf,
-          lambdaWeb: s.h_tw,
-          h: hShape,
-          tw: s.tw,
-          a: aUse,
-          isStiffened: webType === "stiffened",
-          shearPanelH: hUse,
-          Mu: muUse,
-          Vu: vuUse,
-          L: Lin,
-          wLive: wDeflLiveOnly,
-          deflection: delta,
-          deflectionAllowable: Lin / 360,
-          Lb: LbUse,
-          Cb: CbUse,
-          sectionProfile: "W",
-        });
-        return { s, check };
-      })
-      .filter((c) => c.check.isSafe)
-      .sort((a, b) => a.s.W - b.s.W);
-    return candidates[0] ?? null;
+    const wStrengthBase =
+      designMethod === "LRFD" ? lrfdFactoredUniformLoadKlf(DL, LL) : asdStrengthUniformLoadKlf(DL, LL);
+    const muBase = (wStrengthBase * Lft * Lft) / 8;
+    const reqZx = designMethod === "LRFD" ? (12 * muBase) / (0.9 * mat.Fy) : (12 * muBase * 1.67) / mat.Fy;
+    /** Workbook I54: (1800*LL*L^3*(12^2))/(384*E) */
+    const reqIx = (1800 * LL * Lft ** 3 * 12 ** 2) / (384 * 29000);
+    const wShapes = aiscShapes.filter((s) => s.type === "W").slice();
+    const byWeight = wShapes.sort((a, b) => a.W - b.W);
+    const byZx = byWeight.find((s) => s.Zx >= reqZx) ?? null;
+    const byIx = byWeight.find((s) => s.Ix >= reqIx) ?? null;
+    const chosen = byZx && byIx ? (byIx.Zx > byZx.Zx ? byIx : byZx) : byZx ?? byIx;
+    if (!chosen) return null;
+    const hShape = chosen.h && chosen.h > 0 ? chosen.h : chosen.d - 2 * chosen.tf;
+    const hInput = Number(bracingHeightH);
+    const hUse = Number.isFinite(hInput) && hInput > 0 ? hInput : hShape;
+    const shearRef = aiscShapes.find((s) => s.shape === designShearShapeName && s.type === "W") ?? null;
+    const swKlf = chosen.W / 1000;
+    const wStrengthKlf =
+      designMethod === "LRFD"
+        ? lrfdFactoredUniformLoadKlf(DL + swKlf, LL)
+        : asdStrengthUniformLoadKlf(DL + swKlf, LL);
+    const muUse = (wStrengthKlf * Lft * Lft) / 8;
+    const vuUse = (wStrengthKlf * Lft) / 2;
+    const delta = beamSimplySupportedUniformDeflectionFt(LL, Lft, 29000, chosen.Ix || 1);
+    const check = calculateBendingShearDesign({
+      designMethod,
+      E: 29000,
+      Fy: mat.Fy,
+      Zx: chosen.Zx,
+      Sx: chosen.Sx,
+      Ix: chosen.Ix,
+      Iy: chosen.Iy,
+      ry: chosen.ry,
+      d: chosen.d,
+      bf: chosen.bf,
+      tf: chosen.tf,
+      lambdaFlange: chosen.bf_2tf,
+      lambdaWeb: chosen.h_tw,
+      h: hShape,
+      tw: chosen.tw,
+      a: aUse,
+      isStiffened: webType === "stiffened",
+      shearPanelH: hUse,
+      Mu: muUse,
+      Vu: vuUse,
+      L: Lin,
+      wLive: LL,
+      deflection: delta,
+      deflectionAllowable: Lft / 360,
+      Lb: LbUse,
+      Cb: CbUse,
+      sectionProfile: "W",
+      excelParityMode: true,
+    });
+    if (!shearRef) return { s: chosen, check };
+    const shearRefH = shearRef.h && shearRef.h > 0 ? shearRef.h : shearRef.d - 2 * shearRef.tf;
+    const shearRefCheck = calculateBendingShearDesign({
+      designMethod,
+      E: 29000,
+      Fy: mat.Fy,
+      Zx: shearRef.Zx,
+      Sx: shearRef.Sx,
+      Ix: shearRef.Ix,
+      Iy: shearRef.Iy,
+      ry: shearRef.ry,
+      d: shearRef.d,
+      bf: shearRef.bf,
+      tf: shearRef.tf,
+      lambdaFlange: shearRef.bf_2tf,
+      lambdaWeb: shearRef.h_tw,
+      h: shearRefH,
+      tw: shearRef.tw,
+      a: aUse,
+      isStiffened: webType === "stiffened",
+      shearPanelH: hUse,
+      Mu: 0,
+      Vu: vuUse,
+      L: Lin,
+      wLive: LL,
+      deflection: 0,
+      deflectionAllowable: Number.POSITIVE_INFINITY,
+      Lb: LbUse,
+      Cb: CbUse,
+      sectionProfile: "W",
+      excelParityMode: true,
+    });
+    const shearCap = shearRefCheck.results.shear.phiPn;
+    const updated = {
+      ...check,
+      results: {
+        ...check.results,
+        shear: { ...check.results.shear, phiPn: shearCap },
+      },
+      beamLimitStates: check.beamLimitStates
+        ? {
+            ...check.beamLimitStates,
+            shear: {
+              ...check.beamLimitStates.shear,
+              capacity: shearCap,
+              ratio: shearCap > 0 ? vuUse / shearCap : vuUse > 0 ? 999 : 0,
+              cv: shearRefCheck.beamLimitStates?.shear.cv ?? check.beamLimitStates.shear.cv,
+              cvCase: shearRefCheck.beamLimitStates?.shear.cvCase ?? check.beamLimitStates.shear.cvCase,
+            },
+          }
+        : check.beamLimitStates,
+    };
+    if (updated.beamLimitStates) {
+      const rb = updated.beamLimitStates.bending.ratio;
+      const rs = updated.beamLimitStates.shear.ratio;
+      const rd = updated.beamLimitStates.deflection.ratio;
+      const governing = rb >= rs && rb >= rd ? "bending" : rs >= rd ? "shear" : "deflection";
+      updated.beamLimitStates.governing = governing;
+      updated.governingCase = governing;
+      updated.isSafe =
+        updated.beamLimitStates.bending.demand <= updated.beamLimitStates.bending.capacity &&
+        updated.beamLimitStates.shear.demand <= updated.beamLimitStates.shear.capacity &&
+        updated.beamLimitStates.deflection.demand <= updated.beamLimitStates.deflection.capacity;
+      if (governing === "bending") {
+        updated.controllingStrength = updated.beamLimitStates.bending.capacity;
+        updated.demand = updated.beamLimitStates.bending.demand;
+      } else if (governing === "shear") {
+        updated.controllingStrength = updated.beamLimitStates.shear.capacity;
+        updated.demand = updated.beamLimitStates.shear.demand;
+      } else {
+        updated.controllingStrength = updated.beamLimitStates.deflection.capacity;
+        updated.demand = updated.beamLimitStates.deflection.demand;
+      }
+    }
+    return { s: chosen, check: updated };
   }, [
     mode,
     derivedFromLoads,
@@ -332,6 +414,7 @@ export default function BendingShearPage() {
     designMethod,
     lateralSpacingA,
     bracingHeightH,
+    designShearShapeName,
     webType,
   ]);
 
@@ -366,6 +449,7 @@ export default function BendingShearPage() {
     setWebType("unstiffened");
     setLateralSpacingA("10");
     setBracingHeightH("");
+    setDesignShearShapeName("W21X44");
     setMode("check");
   };
 
@@ -436,11 +520,7 @@ export default function BendingShearPage() {
                         ))}
                       </SelectInput>
                     </Field>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-900">Design Parameters</p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -556,6 +636,15 @@ export default function BendingShearPage() {
                     <Field label="Height of bracing, h (in.)" hint="Defaults to section web depth per trial shape when blank.">
                       <TextInputWithUnit value={bracingHeightH} onChange={setBracingHeightH} unit="in" inputMode="decimal" className={editableInputClass} />
                     </Field>
+                    <Field label="Shear reference member (design parity)" hint="Matches workbook J5 / shear block used in design capacity row.">
+                      <SelectInput value={designShearShapeName} onChange={setDesignShearShapeName} className={editableInputClass}>
+                        {designShearShapeOptions.map((s) => (
+                          <option key={s.shape} value={s.shape}>
+                            {s.shape}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    </Field>
                   </div>
 
                   {derivedFromLoads ? (
@@ -570,13 +659,13 @@ export default function BendingShearPage() {
                           Trial M_u = {derivedFromLoads.MuDer.toFixed(3)} kip·ft · Trial V_u = {derivedFromLoads.VuDer.toFixed(3)} kips (before beam weight)
                         </p>
                         <p className="tabular-nums">
-                          Service w for δ check (live only) = {derivedFromLoads.wServiceKipIn.toFixed(6)} kip/in
+                          Service live load for δ check = {derivedFromLoads.wServiceKipIn.toFixed(6)} k/ft
                         </p>
                       </CardBody>
                     </Card>
                   ) : (
                     <p className="mt-4 text-sm font-semibold text-amber-900">
-                      Enter dead load, live load, and span (all positive numbers) to locate the lightest W-shape. Deflection uses unfactored live load only (Excel convention).
+                      Enter dead load, live load, and span (all positive numbers) to run workbook-style section selection. Deflection uses unfactored live load only (Excel convention).
                     </p>
                   )}
                 </div>
@@ -697,7 +786,7 @@ export default function BendingShearPage() {
               <div id="beam-design-result">
               <Card className="border-slate-300 bg-white">
                 <CardBody>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Design of Beam (lightest W-shape)</p>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-slate-800">Design of Beam (workbook section selection)</p>
                   {suggestion ? (
                     <>
                       <p className="mt-1 text-2xl font-bold text-slate-900">{suggestion.s.shape}</p>
@@ -1150,6 +1239,11 @@ function fmtInches(n: number, decimals = 5): string {
   return n.toFixed(decimals);
 }
 
+function fmtFeet(n: number, decimals = 6): string {
+  if (!Number.isFinite(n)) return "—";
+  return n.toFixed(decimals);
+}
+
 function LimitRow(props: {
   title: string;
   demand: number;
@@ -1158,9 +1252,21 @@ function LimitRow(props: {
   unit: string;
 }) {
   const fmtDem =
-    props.unit === "kip-ft" ? fmtKipFt(props.demand) : props.unit === "in" ? fmtInches(props.demand) : fmtKips(props.demand);
+    props.unit === "kip-ft"
+      ? fmtKipFt(props.demand)
+      : props.unit === "in"
+        ? fmtInches(props.demand)
+        : props.unit === "ft"
+          ? fmtFeet(props.demand)
+          : fmtKips(props.demand);
   const fmtCap =
-    props.unit === "kip-ft" ? fmtKipFt(props.capacity) : props.unit === "in" ? fmtInches(props.capacity) : fmtKips(props.capacity);
+    props.unit === "kip-ft"
+      ? fmtKipFt(props.capacity)
+      : props.unit === "in"
+        ? fmtInches(props.capacity)
+        : props.unit === "ft"
+          ? fmtFeet(props.capacity)
+          : fmtKips(props.capacity);
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <p className="text-sm font-semibold text-slate-900">{props.title}</p>

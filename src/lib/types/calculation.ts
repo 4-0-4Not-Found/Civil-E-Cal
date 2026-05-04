@@ -17,7 +17,7 @@ export type CalculationResult = {
 export type BeamLimitStates = {
   bending: { demand: number; capacity: number; ratio: number; unit: "kip-ft" };
   shear: { demand: number; capacity: number; ratio: number; unit: "kips"; cv: number; cvCase: string };
-  deflection: { demand: number; capacity: number; ratio: number; unit: "in" };
+  deflection: { demand: number; capacity: number; ratio: number; unit: "ft" };
   governing: "bending" | "shear" | "deflection";
 };
 

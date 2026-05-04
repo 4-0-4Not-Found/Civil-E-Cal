@@ -7,7 +7,7 @@ import { calculateBendingShearDesign } from "../src/lib/calculations/bending";
 import { calculateCompressionDesign } from "../src/lib/calculations/compression";
 import { calculateTensionDesign } from "../src/lib/calculations/tension";
 import { staggeredNetWidthInches } from "../src/lib/calculations/net-area";
-import { beamSimplySupportedUniformDeflectionIn } from "../src/lib/excel-parity";
+import { beamSimplySupportedUniformDeflectionFt } from "../src/lib/excel-parity";
 import type { AiscShape } from "../src/lib/aisc/types";
 
 const round = (n: number, d: number) => Number(n.toFixed(d));
@@ -133,7 +133,7 @@ const hBeam = w24.h && w24.h > 0 ? w24.h : w24.d - 2 * w24.tf;
 const Lin = 30 * 12;
 const spanFt = 30;
 const LLonly = 3.2;
-const delta = beamSimplySupportedUniformDeflectionIn(LLonly, spanFt, E, w24.Ix || 1);
+const delta = beamSimplySupportedUniformDeflectionFt(LLonly, spanFt, E, w24.Ix || 1);
 const wStrLrfd = Math.max(1.4 * 0.8, 1.2 * 0.8 + 1.6 * 3.2);
 const MuDer = (wStrLrfd * 30 * 30) / 8;
 const VuDer = (wStrLrfd * 30) / 2;
