@@ -114,6 +114,78 @@ npm run lint
 npm test
 ```
 
+### Production readiness check (recommended before turnover)
+
+```bash
+npm run lint && npm test && npm run build
+```
+
+---
+
+## Client turnover package
+
+When handing this project to a client/team, include:
+
+- Project source code (repository access preferred)
+- This `README.md`
+- A short turnover note listing validated modules and known limits
+- Optional screenshots/log snippets showing `lint`, `test`, and `build` passed
+
+Do **not** include:
+
+- `node_modules/`
+- `.next/`
+- Local machine cache/temp folders
+- Any secret files (`.env*`, tokens, credentials)
+
+---
+
+## After receiving the ZIP (client guide)
+
+Follow this exact order:
+
+1. **Extract the ZIP** to a normal folder path (avoid cloud-synced temp folders during first run).
+2. **Open terminal** in the project root (folder containing `package.json`).
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+4. **Run in development**:
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:3000`.
+5. **Run smoke checks**:
+   - Open `/tension`, `/compression`, `/bending-shear`, `/report`
+   - Confirm each page loads and returns results for sample inputs
+6. **Run quality checks**:
+   ```bash
+   npm run lint
+   npm test
+   npm run build
+   ```
+7. **Run production mode (optional, recommended)**:
+   ```bash
+   npm run start
+   ```
+   (Run after `npm run build`.)
+
+If all steps pass, the handoff is healthy.
+
+---
+
+## Issue reporting format (for fast support)
+
+If an output mismatch is found, send:
+
+- Module name (`tension`, `compression`, `bending-shear`, or `report`)
+- Exact input values used
+- Expected output (Excel sheet/cell reference if available)
+- Actual output from app
+- Browser + OS + app version/tag
+
+This format allows fast reproduction and accurate fixes.
+
 ---
 
 ## Usage guide
@@ -157,6 +229,25 @@ API routes live under `src/app/api/`.
 
 - These endpoints are intended for **development diagnostics**.
 - In production builds, diagnostic routes are designed to be **no-ops or unavailable** to keep deployments safe and lightweight.
+
+---
+
+## Turnover and handoff tips
+
+- Prefer sharing a **Git repository link** as the source of truth.
+- If a ZIP is required, generate it from the project root **excluding build/dependency folders**.
+- If both are sent, state clearly: "Repository is canonical; ZIP is snapshot backup."
+
+### Suggested ZIP delivery process
+
+1. Run final checks (`lint`, `test`, `build`).
+2. Create ZIP from clean source.
+3. Upload ZIP to shared storage (Google Drive/OneDrive) with view/download access.
+4. Share:
+   - ZIP download link
+   - Repository link
+   - Branch/tag name used for turnover
+   - Quick start commands from this README
 
 ---
 
